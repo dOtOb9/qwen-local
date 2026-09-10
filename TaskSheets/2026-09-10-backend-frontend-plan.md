@@ -197,6 +197,12 @@ Tauriの**サイドカー(sidecar)機能**で`ollama.exe`をインストーラ�
 (`core:app:default`に`allow-version`が含まれているので追加権限設定は不要)。
 今どのビルドが動いているか一目で分かるようにする目的。
 
+## iOSワークフローを一時無効化
+
+TestFlight対応が済むまで`ios-build.yml`は必ず失敗し続けて通知がうるさいだけなので、
+`gh workflow disable "iOS Device Build (unsigned)"` で無効化した(ファイルは削除せず
+`disabled_manually`状態)。TestFlight対応の実装時に`gh workflow enable`で再開する。
+
 ## 次にやること
 
 - (ユーザー待ち) Apple Developer Program登録 → API Key発行 → アプリ作成
