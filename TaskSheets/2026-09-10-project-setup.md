@@ -1,7 +1,7 @@
 # プロジェクトセットアップ
 
 - 日付: 2026-09-10
-- ステータス: 進行中
+- ステータス: 完了
 
 ## 目的
 
@@ -17,6 +17,4 @@ RTX4070でQwenなどのローカルLLMを動かす。フロントエンドはTau
 
 ## 次にやること
 
-- `frontend-tauri/` の雛形作成 (Tauri + Rust)
-- `backend-ollama/` にOllamaセットアップ手順・スクリプトを整備
-- Qwen2.5系モデルの動作確認 (VRAM 12GBに収まる量子化サイズの選定)
+技術方針とロードマップは [2026-09-10-backend-frontend-plan.md](./2026-09-10-backend-frontend-plan.md) に切り出した。
