@@ -118,11 +118,36 @@ TestFlight(Apple Developer Program $99/年)を提案したが、コストがネ�
   AltStoreの「Source」機能(GitHub Releasesを指すJSONを自作)で代替する想定。
   これは未実装(次回以降の課題)。
 - この方式は初回実行で成功する保証がないため、実際のCIログを見ながら調整する前提。
+- 初回実行は失敗。`xcodebuild`を直接叩いたことが原因で、Tauriが生成した
+  Xcodeプロジェクトの「Build Rust Code」スクリプトフェーズが、`tauri ios build`
+  自身が立てるIPCサーバー(addr file経由)に依存しているため
+  `failed to read missing addr file` でクラッシュした。
+  `xcodebuild`直呼びをやめ、`tauri ios build -- --target aarch64 --debug --ci --
+  CODE_SIGNING_ALLOWED=NO ...` のように、tauri CLI経由でXcodeへの引数だけ
+  署名無効化を渡す形に修正して再実行中。
+
+## 不具合修正: Windowsパッケージ版で "Failed to fetch"
+
+インストールした`v0.1.1`のMSIで、チャット送信が "Failed to fetch" で失敗する不具合。
+- 原因: 本番ビルドのTauriアプリは `https://tauri.localhost` というオリジンから
+  動作するが、これが Ollama の `OLLAMA_ORIGINS` 許可リストに入っておらず、
+  CORSで403 Forbiddenになっていた。開発時(`tauri dev`)は `http://localhost:1420`
+  というOllamaのデフォルト許可オリジンで動いていたため気づかなかった。
+- 対処: ユーザー環境変数 `OLLAMA_ORIGINS` に `https://tauri.localhost` を追加して
+  Ollamaを再起動。
+  - ハマった点: `tauri://localhost` (ワイルドカードなしの非http/httpsスキーム)を
+    含めるとOllamaが起動時にpanicする(`bad origin: origins must contain '*' or
+    include http://,https://,...`)。Ollamaのデフォルト許可リストには`tauri://*`
+    (ワイルドカード付き)は最初から入っているが、`https://tauri.localhost`という
+    具体的なオリジンは入っていないので、これを追加する必要がある。
+  - 今回はその場でOllamaプロセスを再起動して確認したが、Windows起動時に自動起動する
+    Ollama(トレイアプリ)にも環境変数が正しく効いているか、PC再起動後に要確認。
 
 ## 次にやること
 
-- iOS実機向け.ipaビルド(`ios-build.yml`)の実行結果を確認し、失敗があれば修正する
+- iOS実機向け.ipaビルド(`ios-build.yml`)の再実行結果を確認する
 - 成功したら、Windows PCにAltServerをインストールし、実機への初回サイドロードを試す
 - AltStoreのSource JSONを自作し、Releaseベースの更新通知を作る(任意、後回し可)
+- PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する
 - iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
 - ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)
