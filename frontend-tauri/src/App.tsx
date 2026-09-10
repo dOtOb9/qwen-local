@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -33,8 +34,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
+    getVersion().then(setAppVersion);
+
     (async () => {
       const [existingSessions, existingMemories] = await Promise.all([
         listSessions(),
@@ -175,7 +179,12 @@ function App() {
       />
 
       <main className="flex h-screen flex-1 flex-col gap-4 p-4">
-        <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
+          {appVersion && (
+            <span className="text-xs text-muted-foreground">v{appVersion}</span>
+          )}
+        </div>
         {updateStatus && (
           <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             {updateStatus}

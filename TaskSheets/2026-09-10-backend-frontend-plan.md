@@ -190,6 +190,13 @@ Tauriの**サイドカー(sidecar)機能**で`ollama.exe`をインストーラ�
 
 → ユーザー判断で**保留**。着手していない。
 
+## UIにバージョン番号を表示
+
+`@tauri-apps/api/app`の`getVersion()`でアプリバージョンを取得し、
+ヘッダーに `Qwen Local Chat v0.1.x` の形で表示するようにした
+(`core:app:default`に`allow-version`が含まれているので追加権限設定は不要)。
+今どのビルドが動いているか一目で分かるようにする目的。
+
 ## 次にやること
 
 - (ユーザー待ち) Apple Developer Program登録 → API Key発行 → アプリ作成
