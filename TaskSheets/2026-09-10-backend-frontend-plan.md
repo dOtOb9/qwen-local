@@ -203,12 +203,25 @@ TestFlight対応が済むまで`ios-build.yml`は必ず失敗し続けて通知�
 `gh workflow disable "iOS Device Build (unsigned)"` で無効化した(ファイルは削除せず
 `disabled_manually`状態)。TestFlight対応の実装時に`gh workflow enable`で再開する。
 
+## iOS対応を断念(一旦保留)
+
+署名(TestFlight)周りを整えても、iOS側には推論エンジンが何もないため
+「開けるけど何もできないアプリ」にしかならないと気づき、iOS対応自体を
+一旦断念することに決定。理由:
+- iPhone上では`http://localhost:11434`はiPhone自身を指すため、PCのOllamaには
+  そもそも繋がらない(Windows版と同じフロントのコードをそのまま動かしても無意味)
+- チャットを実際に動かすには、オンデバイス推論エンジン(llama.cpp Metal / MLX)の
+  組み込みか、PCのOllamaへのLAN経由接続のどちらかが別途必要で、TestFlightの
+  署名設定より先にこちらを決めるべきだった
+- Apple Developer Program登録($99/年)は保留。ユーザーへの依頼もキャンセル
+
+`ios-build.yml`は無効化したまま残し(`frontend-tauri/`ディレクトリのコードも
+iOSシェルとして残置)、当面はWindows版に集中する。iOS再開時はまず
+オンデバイス推論エンジンの技術調査から。
+
 ## 次にやること
 
-- (ユーザー待ち) Apple Developer Program登録 → API Key発行 → アプリ作成
-- 上記が揃い次第、`ios-build.yml`をTestFlight自動アップロード構成に書き換える
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
 - (保留) Ollama同梱(sidecar)案の実装
 - PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する
-- iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
-- ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)
+- ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版に集中)
