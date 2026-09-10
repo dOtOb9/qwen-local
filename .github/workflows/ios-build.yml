@@ -33,43 +33,21 @@ jobs:
       - name: Initialize iOS project
         run: npm run tauri ios init -- --ci
 
-      - name: Build frontend assets
-        run: npm run build
-
-      - name: Find Xcode scheme
-        id: xcode
+      - name: Build for device via tauri CLI (unsigned)
         run: |
-          cd src-tauri/gen/apple
-          PROJECT=$(find . -maxdepth 1 -name "*.xcodeproj" | head -n 1)
-          echo "Found project: $PROJECT"
-          xcodebuild -project "$PROJECT" -list
-          SCHEME=$(xcodebuild -project "$PROJECT" -list | awk '/Schemes:/{flag=1;next}flag && NF{print $1; exit}')
-          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
-          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
-          echo "Using scheme: $SCHEME"
-
-      - name: Build unsigned .app for device
-        run: |
-          cd src-tauri/gen/apple
-          xcodebuild build \
-            -project "${{ steps.xcode.outputs.project }}" \
-            -scheme "${{ steps.xcode.outputs.scheme }}" \
-            -configuration debug \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+          npm run tauri ios build -- --target aarch64 --debug --ci -- \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
       - name: Package .app into .ipa
         id: package
         run: |
           cd src-tauri/gen/apple
-          APP_PATH=$(find build/Build/Products -maxdepth 2 -type d -name "*.app" | head -n 1)
+          APP_PATH=$(find . -type d -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "No .app found; build likely failed" >&2
             exit 1
           fi
+          echo "Found app: $APP_PATH"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -r qwen-local.ipa Payload
