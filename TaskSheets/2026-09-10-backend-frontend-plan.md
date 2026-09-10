@@ -80,8 +80,27 @@ Windows版(PC本体, RTX4070)とiOS版で使うモデルを分ける方針に決
   (現状のiOSビルドはUIシェルのみで、Ollamaにネットワーク越しに繋ぐ構成にもなっていない)。
   モデル分離の実装は、iOS用オンデバイス推論エンジンを組み込むタイミングでまとめて行う。
 
+- 2026-09-10: iOS Actionsワークフロー、初回で成功(macos-latest, 4m12s、
+  シミュレータ用`.app`をartifactアップロード)。
+
+## 自動アップデート機能(Windows)
+
+- push → GitHub Actions(`windows-latest`)でMSI/NSISインストーラをビルドし、
+  GitHub Releaseとして公開する構成(`.github/workflows/windows-build.yml`)。
+  ビルドのたびに `tauri.conf.json` のversionを `0.1.<GITHUB_RUN_NUMBER>` に
+  自動インクリメントし、常に最新バージョンとしてリリースされるようにしている。
+- 署名用の鍵ペアは `tauri signer generate` で作成(パスワードなし)。
+  公開鍵は `tauri.conf.json` の `plugins.updater.pubkey` に、秘密鍵は
+  GitHub Secrets (`TAURI_SIGNING_PRIVATE_KEY`) に登録済み。秘密鍵ファイル
+  (`frontend-tauri/updater-key.pem`)はローカルのみに存在し、.gitignore済み。
+- アプリ側は `@tauri-apps/plugin-updater` + `plugin-process` を追加し、
+  起動時に `https://github.com/dOtOb9/qwen-local/releases/latest/download/latest.json`
+  を確認、新バージョンがあればダウンロード→インストール→自動再起動する
+  (`src/lib/updater.ts`)。
+
 ## 次にやること
 
-- iOS Actionsワークフローの実行結果を確認し、失敗があれば修正する
+- Windows Actionsワークフローの実行結果を確認し、MSIビルド・リリース・
+  latest.json生成が正しく動くか検証する
 - iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
 - ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)

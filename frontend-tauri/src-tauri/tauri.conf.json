@@ -24,6 +24,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -31,5 +32,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNCOUREOUY5MDFFM0Q3NjYKUldSbTErTUIrZG1kTytGYmx6WExFVnJiblNXVWtJK2VoQXZNRmYvMUVWWTB3a3VyMUxFdys2TVgK",
+      "endpoints": [
+        "https://github.com/dOtOb9/qwen-local/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

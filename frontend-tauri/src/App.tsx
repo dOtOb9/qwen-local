@@ -18,6 +18,7 @@ import {
   type Session,
   type StoredMessage,
 } from "@/lib/db";
+import { checkForUpdateAndInstall } from "@/lib/updater";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -31,6 +32,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -44,6 +46,10 @@ function App() {
         setActiveSessionId(existingSessions[0].id);
       }
     })();
+
+    checkForUpdateAndInstall(setUpdateStatus).catch((e) => {
+      console.error("Update check failed:", e);
+    });
   }, []);
 
   useEffect(() => {
@@ -170,6 +176,11 @@ function App() {
 
       <main className="flex h-screen flex-1 flex-col gap-4 p-4">
         <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
+        {updateStatus && (
+          <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+            {updateStatus}
+          </p>
+        )}
 
         <Card className="flex-1 overflow-hidden p-0">
           <ScrollArea className="h-full p-4">
