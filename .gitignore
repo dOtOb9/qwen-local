@@ -1,0 +1,17 @@
+# Rust / Tauri
+/target/
+/frontend-tauri/target/
+/frontend-tauri/node_modules/
+/frontend-tauri/src-tauri/target/
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
