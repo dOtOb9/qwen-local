@@ -35,6 +35,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [rememberStatus, setRememberStatus] = useState<string | null>(null);
 
   useEffect(() => {
     getVersion().then(setAppVersion);
@@ -51,9 +52,11 @@ function App() {
       }
     })();
 
-    checkForUpdateAndInstall(setUpdateStatus).catch((e) => {
-      console.error("Update check failed:", e);
-    });
+    if (!import.meta.env.DEV) {
+      checkForUpdateAndInstall(setUpdateStatus).catch((e) => {
+        console.error("Update check failed:", e);
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -89,6 +92,13 @@ function App() {
     setMemories(await listMemories());
   }
 
+  async function handleRememberText(content: string) {
+    await handleAddMemory(content);
+    const preview = content.length > 40 ? content.slice(0, 40) + "…" : content;
+    setRememberStatus(`記憶しました: ${preview}`);
+    setTimeout(() => setRememberStatus(null), 3000);
+  }
+
   async function handleDeleteMemory(id: number) {
     await deleteMemory(id);
     setMemories((prev) => prev.filter((m) => m.id !== id));
@@ -97,6 +107,15 @@ function App() {
   async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
+
+    if (text.startsWith("/remember ")) {
+      const memoryText = text.slice("/remember ".length).trim();
+      setInput("");
+      if (memoryText) {
+        await handleRememberText(memoryText);
+      }
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -198,12 +217,32 @@ function App() {
                 <div
                   key={i}
                   className={
-                    m.role === "user"
-                      ? "self-end whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-primary-foreground"
-                      : "self-start rounded-lg bg-muted px-3 py-2 text-foreground"
+                    "group relative max-w-[85%] " +
+                    (m.role === "user" ? "self-end" : "self-start")
                   }
                 >
-                  {m.role === "assistant" ? <MessageContent content={m.content} /> : m.content}
+                  <div
+                    className={
+                      m.role === "user"
+                        ? "whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-primary-foreground"
+                        : "rounded-lg bg-muted px-3 py-2 text-foreground"
+                    }
+                  >
+                    {m.role === "assistant" ? (
+                      <MessageContent content={m.content} />
+                    ) : (
+                      m.content
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRememberText(m.content)}
+                    className="absolute -top-2 hidden rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm hover:text-foreground group-hover:block"
+                    style={m.role === "user" ? { left: "-0.25rem" } : { right: "-0.25rem" }}
+                    title="このメッセージを長期記憶に保存"
+                  >
+                    覚える
+                  </button>
                 </div>
               ))}
               {loading && <div className="text-sm text-muted-foreground">考え中...</div>}
@@ -212,6 +251,9 @@ function App() {
         </Card>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {rememberStatus && (
+          <p className="text-sm text-muted-foreground">{rememberStatus}</p>
+        )}
 
         <form
           className="flex gap-2"
@@ -223,7 +265,7 @@ function App() {
           <Input
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
-            placeholder="メッセージを入力..."
+            placeholder="メッセージを入力... (/remember で長期記憶に保存)"
             disabled={loading}
           />
           <Button type="submit" disabled={loading || !input.trim()}>

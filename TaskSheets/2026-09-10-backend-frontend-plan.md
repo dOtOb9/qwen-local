@@ -219,6 +219,45 @@ TestFlight対応が済むまで`ios-build.yml`は必ず失敗し続けて通知�
 iOSシェルとして残置)、当面はWindows版に集中する。iOS再開時はまず
 オンデバイス推論エンジンの技術調査から。
 
+## 長期記憶をチャットから直接操作できるように
+
+「サイドバーの小さい入力欄にしか記憶を追加できない」使いにくさを解消。
+- メッセージ(ユーザー/アシスタントどちらも)にホバーすると「覚える」ボタンが出て、
+  そのメッセージ本文をそのまま長期記憶に保存できるようにした
+- 入力欄で `/remember <text>` と打つと、Ollamaに送らずその場でメモとして保存する
+  ショートカットを追加。保存すると「記憶しました: ...」と一時的に表示される
+
+## 不具合修正: 開発版と本番インストール版がSQLite DB/WebView2プロファイルを共有
+
+`npm run tauri dev` で起動する開発版と、インストール済みの本番アプリが
+**同じアプリ識別子**(`com.masa1.frontend-tauri`)を使っていたため、
+`%APPDATA%\com.masa1.frontend-tauri\` 以下のSQLiteデータベースと
+WebView2のユーザーデータフォルダ(`EBWebView`)を共有してしまっていた。
+両方を同時に起動すると競合し、開発版がアプリウィンドウを開かずに
+サイレントに終了する(exit code 0)という分かりにくい形で現れた。
+- 対処: `src-tauri/tauri.dev.conf.json` に開発専用の識別子
+  (`com.masa1.frontend-tauri.dev`)を定義し、`npm run dev:app`
+  (`tauri dev --config src-tauri/tauri.dev.conf.json`)で起動するようにした。
+  これで本番版とは別のDB・別のWebView2プロファイルになり競合しない。
+- 今後、手元で動作確認する時は `npm run tauri dev` ではなく
+  `npm run dev:app` を使うこと。
+
+## 不具合修正(本命): 開発版が自動アップデートで本番版に化けていた
+
+識別子分離後も「本番と同じ権限を求められて競合している」という報告があり、
+再調査したところ真因が判明。`tauri.dev.conf.json`は`identifier`と`productName`
+しか上書きしておらず、**`version`は上書きされていないため開発版は常に`0.1.0`のまま**
+だった。一方GitHub Releaseは`v0.1.3`まで進んでいたため、開発版を起動するたびに
+`checkForUpdateAndInstall()`がGitHubの方を新しいと判定し、勝手にMSI/NSISを
+ダウンロード→インストール→`relaunch()`していた。これが「本番と同じ権限要求
+(インストーラのUAC/SmartScreen)」の正体で、開発版ウィンドウが一瞬で消えて
+本番版に置き換わっていたように見えていた。
+- 対処: `App.tsx`で `import.meta.env.DEV` (Viteが埋め込む開発/本番フラグ)を見て、
+  開発ビルドでは`checkForUpdateAndInstall()`自体を呼ばないようにした。
+- 教訓: dev/prod分離は識別子(DB・WebView2プロファイル)だけでなく、
+  バージョン番号や「本番だけが持つべき挙動(自動更新など)」も一緒に
+  見直す必要があった。
+
 ## 次にやること
 
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
