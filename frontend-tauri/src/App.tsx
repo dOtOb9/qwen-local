@@ -29,6 +29,8 @@ import {
   extractPdfText,
   parseAttachedFileMessage,
 } from "@/lib/pdf";
+import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
+import { getSetting } from "@/lib/db";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -50,6 +52,7 @@ function App() {
   );
   const [attaching, setAttaching] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [issueStatus, setIssueStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const unlistenPromise = getCurrentWebview().onDragDropEvent((event) => {
@@ -163,6 +166,34 @@ function App() {
     await attachPdfFromPath(path);
   }
 
+  // Silently checks the latest exchange for an implied feature request and,
+  // if the model thinks there is one, files it as a GitHub Issue with no
+  // user interaction. Never surfaces errors — this must not interrupt chat.
+  async function maybeFileIdeaFromExchange(userText: string, assistantText: string) {
+    try {
+      const [token, repo] = await Promise.all([
+        getSetting("github_token"),
+        getSetting("github_repo"),
+      ]);
+      if (!token || !repo) return;
+
+      const classifyMessages = [
+        { role: "system", content: IDEA_DETECTION_PROMPT },
+        { role: "user", content: userText },
+        { role: "assistant", content: assistantText },
+      ];
+      const result = await chatWithTools(OLLAMA_URL, MODEL, classifyMessages);
+      const idea = parseIdeaMessage(result);
+      if (!idea) return;
+
+      await createGithubIssue(token, repo, idea.title, idea.body);
+      setIssueStatus(`💡 Issueを自動作成しました: ${idea.title}`);
+      setTimeout(() => setIssueStatus(null), 6000);
+    } catch {
+      // best-effort background task; swallow failures silently
+    }
+  }
+
   async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
@@ -232,6 +263,9 @@ function App() {
         },
       ]);
       await addMessage(sessionId, "assistant", assistantContent);
+
+      // Fire-and-forget: don't block the chat UI on this.
+      maybeFileIdeaFromExchange(text, assistantContent);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -262,6 +296,11 @@ function App() {
         {updateStatus && (
           <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             {updateStatus}
+          </p>
+        )}
+        {issueStatus && (
+          <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+            {issueStatus}
           </p>
         )}
 

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { MemoryDialog } from "@/components/MemoryDialog";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import type { Memory, Session } from "@/lib/db";
 
 type SidebarProps = {
@@ -55,12 +56,13 @@ export function Sidebar({
         ))}
       </div>
 
-      <div className="border-t border-border pt-3">
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
         <MemoryDialog
           memories={memories}
           onAddMemory={onAddMemory}
           onDeleteMemory={onDeleteMemory}
         />
+        <SettingsDialog />
       </div>
     </aside>
   );

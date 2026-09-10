@@ -312,8 +312,53 @@ Tauriのwebviewは`<a href>`クリックをデフォルトでアプリ内遷移�
     「📄 ファイル名 + 質問文」だけのコンパクトな表示にするパース処理
     (`parseAttachedFileMessage`)を実装。
 
+## 自己改善パイプライン: チャットから自動でGitHub Issueが溜まる仕組み
+
+「チャットしていく中で自然と機能アイデアがIssueとして溜まっていき、
+GitHub Actionsの定期実行でクラウドのClaude Codeが実装してPRを出す」という
+仕組みを構築中。2つのパートに分かれる。
+
+### パート1: アプリ側(実装済み)
+
+- ボタン操作なし、完全にバックグラウンドで動作する設計に変更した
+  (最初はボタン式のUIで作ったが、ユーザーから「明示的な操作ではなく自然に溜まる形に」
+  と指摘があり作り直した)。
+- 仕組み: `sendMessage()`で通常の応答を返した**直後**に、直近のユーザー発言+
+  アシスタント応答の1往復だけを material に、隠れたLLM呼び出し
+  (`IDEA_DETECTION_PROMPT`, `src/lib/github.ts`)を発火(fire-and-forget、
+  チャットのレスポンス自体はブロックしない)。このプロンプトは
+  「このアプリへの機能要望が明確に読み取れる場合だけ【アイデア】形式で出力、
+  それ以外は NONE とだけ出力」という厳格な指示にして、雑談がIssue化されないようにした。
+  NONE以外が返ってきた時だけ、Rust側の新コマンド`create_github_issue`
+  (`src-tauri/src/github.rs`, reqwestでGitHub REST APIを直接叩く)経由で
+  Issueを自動作成する。エラーは全て握りつぶし、チャット体験を妨げない設計。
+- GitHub Token / 投稿先リポジトリは、新設した`settings`テーブル
+  (SQLiteマイグレーションv2)に保存。サイドバーの「設定」ダイアログ
+  (`SettingsDialog.tsx`)から入力・保存する。未設定の間は何もしない(サイレント)。
+  Tokenは repo スコープの Personal Access Token が必要(ユーザー自身が発行)。
+
+### パート2: GitHub Actions側(ユーザー対応待ち)
+
+- クラウドでのClaude Code定期実行は、Claude Code公式の`/install-github-app`
+  コマンドで構築するのが正解と判明(claude-code-guideエージェントで調査)。
+  - GitHub Appのインストール自体はGitHubの仕様上、リポジトリ所有者の
+    Web上での明示的な認可操作が必須(Claude側から代行不可)。ただしこれは
+    **最初の1回だけ**で、以降のcron定期実行・Issue実装・PR作成は完全に
+    バックグラウンドで動く。
+  - 認証は既存のClaude Pro/Max等のサブスクリプション(OAuthトークン)を
+    そのまま使えるので、追加のAPI従量課金は基本的に不要。
+  - cronトリガーは公式にサポートされている
+    (`on: schedule: - cron: "..."`)。
+  - 注意点: publicリポジトリのscheduled runは60日操作がないと自動停止する。
+    何もIssueが無いタイミングでも定期実行自体はAPIトークンを消費する
+    (「Issueが無ければスキップ」はプロンプト側で制御する必要がある)。
+- ユーザーがこのリポジトリに対して`/install-github-app`を実行し、
+  cron + 「ラベル付きIssueを実装してPRを出す」ワークフローの内容を詰める
+  作業待ち。
+
 ## 次にやること
 
+- (ユーザー対応待ち) `/install-github-app`の実行、およびcronワークフローの内容確定
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
 - (保留) Ollama同梱(sidecar)案の実装
 - PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する

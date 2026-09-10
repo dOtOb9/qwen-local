@@ -1,3 +1,4 @@
+mod github;
 mod search;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -27,6 +28,16 @@ pub fn run() {
             );
         ",
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 2,
+        description: "create_settings",
+        sql: "
+            CREATE TABLE settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+        ",
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -40,7 +51,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![search::search_web])
+        .invoke_handler(tauri::generate_handler![
+            search::search_web,
+            github::create_github_issue
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
