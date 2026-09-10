@@ -98,9 +98,31 @@ Windows版(PC本体, RTX4070)とiOS版で使うモデルを分ける方針に決
   を確認、新バージョンがあればダウンロード→インストール→自動再起動する
   (`src/lib/updater.ts`)。
 
+- 2026-09-10: Windows Actionsワークフロー、初回で成功(10m12s)。
+  `Qwen Local Chat v0.1.1` としてGitHub Releaseが作成され、MSI/NSIS/署名/
+  latest.jsonすべて正しく生成されることを確認。
+
+## iOS実機配布方針(コスト面から無料ルートに変更)
+
+TestFlight(Apple Developer Program $99/年)を提案したが、コストがネックとの
+ことで無料ルートに変更。
+- **AltStore/AltServer方式**に決定。CIはiOS向けに**署名なしの.ipa**を生成するだけに
+  留め、実機への署名・インストール・7日ごとの自動再署名はWindows PC上のAltServer
+  (無料、Mac不要)が担う。
+- `.github/workflows/ios-build.yml` を「シミュレータビルド」から「実機向け
+  署名なし.ipaビルド」に変更。`tauri ios build` の署名付きアーカイブ/エクスポート
+  フロー(Apple ID必須)を使わず、`xcodebuild build` を直接 `CODE_SIGNING_ALLOWED=NO`
+  で実行し、生成された`.app`を手動で`Payload/`に詰めて`.ipa`化する方式。
+  Apple Developer Programは一切不要。
+- 自動アップデートはWindows版のTauri updaterほどシームレスではなく、
+  AltStoreの「Source」機能(GitHub Releasesを指すJSONを自作)で代替する想定。
+  これは未実装(次回以降の課題)。
+- この方式は初回実行で成功する保証がないため、実際のCIログを見ながら調整する前提。
+
 ## 次にやること
 
-- Windows Actionsワークフローの実行結果を確認し、MSIビルド・リリース・
-  latest.json生成が正しく動くか検証する
+- iOS実機向け.ipaビルド(`ios-build.yml`)の実行結果を確認し、失敗があれば修正する
+- 成功したら、Windows PCにAltServerをインストールし、実機への初回サイドロードを試す
+- AltStoreのSource JSONを自作し、Releaseベースの更新通知を作る(任意、後回し可)
 - iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
 - ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)

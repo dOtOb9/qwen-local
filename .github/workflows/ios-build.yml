@@ -1,4 +1,4 @@
-name: iOS Simulator Build
+name: iOS Device Build (unsigned)
 
 on:
   push:
@@ -8,8 +8,11 @@ on:
       - ".github/workflows/ios-build.yml"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
-  build-ios-simulator:
+  build-ios-device:
     runs-on: macos-latest
     defaults:
       run:
@@ -30,21 +33,55 @@ jobs:
       - name: Initialize iOS project
         run: npm run tauri ios init -- --ci
 
-      - name: Build for iOS simulator
-        run: npm run tauri ios build -- --target aarch64-sim --debug --ci
+      - name: Build frontend assets
+        run: npm run build
 
-      - name: Locate built .app bundle
-        id: find_app
+      - name: Find Xcode scheme
+        id: xcode
         run: |
-          APP_PATH=$(find src-tauri/gen/apple -type d -name "*.app" | head -n 1)
-          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          cd src-tauri/gen/apple
+          PROJECT=$(find . -maxdepth 1 -name "*.xcodeproj" | head -n 1)
+          echo "Found project: $PROJECT"
+          xcodebuild -project "$PROJECT" -list
+          SCHEME=$(xcodebuild -project "$PROJECT" -list | awk '/Schemes:/{flag=1;next}flag && NF{print $1; exit}')
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Using scheme: $SCHEME"
 
-      - name: Upload simulator app bundle
-        if: steps.find_app.outputs.app_path != ''
+      - name: Build unsigned .app for device
+        run: |
+          cd src-tauri/gen/apple
+          xcodebuild build \
+            -project "${{ steps.xcode.outputs.project }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -configuration debug \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package .app into .ipa
+        id: package
+        run: |
+          cd src-tauri/gen/apple
+          APP_PATH=$(find build/Build/Products -maxdepth 2 -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found; build likely failed" >&2
+            exit 1
+          fi
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r qwen-local.ipa Payload
+          echo "ipa_path=src-tauri/gen/apple/qwen-local.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Upload .ipa artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-simulator-app
-          path: frontend-tauri/${{ steps.find_app.outputs.app_path }}
+          name: ios-unsigned-ipa
+          path: frontend-tauri/src-tauri/gen/apple/qwen-local.ipa
+          if-no-files-found: warn
 
       - name: Upload full apple build dir (debug)
         if: always()
