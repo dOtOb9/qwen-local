@@ -66,8 +66,22 @@ Tauri製デスクトップアプリから利用できるようにする。
     リポジトリをPublicに変更し、GitHub Actions の `macos-latest` ランナー(Public repoは無料)
     でiOSシミュレータビルドを試す方針に決定。署名して実機に入れるのは次の段階。
 
+- 2026-09-10: `.github/workflows/ios-build.yml` を追加。macos-latestランナーで
+  `tauri ios init` → `tauri ios build --target aarch64-sim --debug --ci` を実行し、
+  シミュレータ用.appをartifactとしてアップロードする構成。署名は行わない(実機配布は保留)。
+
+## 設計方針: プラットフォームごとのモデル分離
+
+Windows版(PC本体, RTX4070)とiOS版で使うモデルを分ける方針に決定。
+- **Windows版**: 引き続きOllama経由で `qwen2.5:7b-instruct` などVRAMに余裕のあるモデルを使う。
+- **iOS版**: iPhone上で完結する軽量モデル(Qwen2.5の0.5B/1.5B級など)を、
+  Ollamaではなくllama.cpp(Metal)やMLX等のオンデバイス推論エンジンで動かす想定。
+- 前提として、iOS側にはまだ推論エンジンそのものが実装されていない
+  (現状のiOSビルドはUIシェルのみで、Ollamaにネットワーク越しに繋ぐ構成にもなっていない)。
+  モデル分離の実装は、iOS用オンデバイス推論エンジンを組み込むタイミングでまとめて行う。
+
 ## 次にやること
 
-- M2続き: GitHub Actionsで `tauri ios init` → シミュレータビルドのワークフローを作成し、
-  実際にActions上でビルドが通るか確認する
-- ストリーミング表示、モデル切り替えなどM3の残タスク
+- iOS Actionsワークフローの実行結果を確認し、失敗があれば修正する
+- iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
+- ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)

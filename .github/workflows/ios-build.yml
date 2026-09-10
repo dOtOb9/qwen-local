@@ -1,0 +1,55 @@
+name: iOS Simulator Build
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "frontend-tauri/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build-ios-simulator:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: frontend-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Add iOS Rust targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Initialize iOS project
+        run: npm run tauri ios init -- --ci
+
+      - name: Build for iOS simulator
+        run: npm run tauri ios build -- --target aarch64-sim --debug --ci
+
+      - name: Locate built .app bundle
+        id: find_app
+        run: |
+          APP_PATH=$(find src-tauri/gen/apple -type d -name "*.app" | head -n 1)
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload simulator app bundle
+        if: steps.find_app.outputs.app_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: frontend-tauri/${{ steps.find_app.outputs.app_path }}
+
+      - name: Upload full apple build dir (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-build-debug
+          path: frontend-tauri/src-tauri/gen/apple
+          retention-days: 3
