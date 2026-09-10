@@ -143,11 +143,36 @@ TestFlight(Apple Developer Program $99/年)を提案したが、コストがネ�
   - 今回はその場でOllamaプロセスを再起動して確認したが、Windows起動時に自動起動する
     Ollama(トレイアプリ)にも環境変数が正しく効いているか、PC再起動後に要確認。
 
+- 2026-09-10: iOS実機向け.ipaビルド、2回目も失敗。今度は
+  `error: Signing for "frontend-tauri_iOS" requires a development team.`
+  `tauri ios build`は実機ターゲットだと必ずアーカイブ+エクスポートフローを通り、
+  そこでの署名要求はxcodebuild引数(`CODE_SIGNING_ALLOWED=NO`)では回避できないと判明。
+
+## iOS方針転換: 無料ルートを断念、TestFlightに変更
+
+fastlaneでの無料Apple ID自動署名を検討したが、調査の結果**技術的に不可能**と判明。
+`cert`/`sigh`/`match`はいずれも有料Apple Developer Program前提のDeveloper Portal APIを
+使っており、無料のPersonal Team署名(Xcode専用の非公開プロトコル)にはアクセスできない。
+AltServer/AltStoreが存在するのはまさにこの非公開プロトコルを独自実装しているため。
+
+→ コストより確実性を優先し、**TestFlight($99/年)方式に方針転換**。
+
+### ユーザー側で必要な手続き(代行不可、本人のApple IDが必要)
+
+1. Apple Developer Programへの登録( https://developer.apple.com/programs/enroll/ 、
+   本人確認・支払い必要、承認まで最大48時間程度)
+2. 承認後、App Store ConnectでApp Store Connect API Keyを発行
+   (ユーザーとアクセス → 統合 → App Store Connect API)。
+   `Issuer ID` / `Key ID` / `.p8`秘密鍵ファイルの3点が必要
+3. App Store Connectで新規アプリを作成(Bundle ID: `com.masa1.frontend-tauri`)
+
+この3点が揃い次第、GitHub Secretsに登録してCIを
+「自動署名 + TestFlightへの自動アップロード」に書き換える。
+
 ## 次にやること
 
-- iOS実機向け.ipaビルド(`ios-build.yml`)の再実行結果を確認する
-- 成功したら、Windows PCにAltServerをインストールし、実機への初回サイドロードを試す
-- AltStoreのSource JSONを自作し、Releaseベースの更新通知を作る(任意、後回し可)
+- (ユーザー待ち) Apple Developer Program登録 → API Key発行 → アプリ作成
+- 上記が揃い次第、`ios-build.yml`をTestFlight自動アップロード構成に書き換える
 - PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する
 - iOS用オンデバイス推論エンジン(llama.cpp Metal / MLX)の技術調査・組み込み
 - ストリーミング表示、モデル切り替えなどM3の残タスク(Windows版)
