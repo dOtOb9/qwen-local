@@ -20,6 +20,7 @@ import {
   type StoredMessage,
 } from "@/lib/db";
 import { checkForUpdateAndInstall } from "@/lib/updater";
+import { chatWithTools } from "@/lib/ollama";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -153,18 +154,7 @@ function App() {
       }
       chatMessages.push(...nextMessages.map((m) => ({ role: m.role, content: m.content })));
 
-      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MODEL, messages: chatMessages, stream: false }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
-      }
-
-      const data = await res.json();
-      const assistantContent: string = data.message.content;
+      const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages);
 
       setMessages((prev) => [
         ...prev,

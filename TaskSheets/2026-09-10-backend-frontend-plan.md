@@ -258,8 +258,44 @@ WebView2のユーザーデータフォルダ(`EBWebView`)を共有してしま�
   バージョン番号や「本番だけが持つべき挙動(自動更新など)」も一緒に
   見直す必要があった。
 
+## Web検索機能を追加(Ollama tool calling + DuckDuckGo)
+
+qwen2.5:7b-instructがtool callingに対応しているため、Ollamaの`tools`機能で
+Web検索を組み込んだ。バックエンドはコスト面からDuckDuckGoの非公式HTML
+スクレイピングを選択。
+
+- Rust側(`src-tauri/src/search.rs`): `search_web(query)` コマンドを追加。
+  `reqwest` + `scraper` で `https://html.duckduckgo.com/html/` から上位5件を取得。
+  - ハマった点1: 単純なGETリクエストだとDuckDuckGoのBot検知(CAPTCHAページ)に
+    弾かれ、空の結果になる。**POSTでフォーム送信** + `Accept`/`Accept-Language`/
+    `Referer`ヘッダーを付けると正常に結果が返ることをcurlで確認して回避。
+  - ハマった点2: `reqwest`のデフォルトTLS実装(rustls)が`aws-lc-rs`のバージョン
+    解決に失敗してビルドできなかった。`native-tls`(Windowsのschannel経由)に
+    切り替えて解決。
+  - 広告枠(`result--ad`)を除外し、`div.result.web-result`のみ拾うようにした。
+  - `cargo test`でRust単体テストを書いて直接検証(GUI全体を再ビルドするより
+    高速に確認できた)。
+- フロント側(`src/lib/ollama.ts`): `chatWithTools()` を新設。Ollamaの
+  `/api/chat`に`tools`定義を渡し、`tool_calls`が返ってきたら`invoke("search_web")`
+  を呼んで結果をtoolメッセージとして追加、モデルに再度投げ直すループ
+  (最大3ラウンド)を実装。`App.tsx`の直接fetchをこれに置き換えた。
+- 動作確認の顛末: 最初にユーザーがテストした際は「検索していると言うが
+  最新情報にアクセスできていない」状態だった。原因はBot検知の初期バージョンを
+  ビルドしたまま試していたため(空配列がtool結果として返り、モデルが
+  自分の知識で答えていた)。POST修正後に再ビルド・再起動して解消。
+
+## 不具合修正: メッセージ内リンクをクリックするとアプリ内で遷移して戻れない
+
+Tauriのwebviewは`<a href>`クリックをデフォルトでアプリ内遷移させてしまい、
+外部サイトに飛ぶと戻れなくなる。`MessageContent.tsx`でreact-markdownの
+`components`propを使い、リンククリックを`preventDefault`した上で
+`@tauri-apps/plugin-opener`の`openUrl()`で既定のブラウザで開くように修正
+(プラグイン自体はテンプレートに元々入っていたので追加インストール不要、
+`opener:default`権限にも`allow-open-url`が最初から含まれていた)。
+
 ## 次にやること
 
+- ファイルアップロード対応(PDF読み込み)に着手する
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
 - (保留) Ollama同梱(sidecar)案の実装
 - PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する
