@@ -24,11 +24,15 @@ const SEARCH_TOOL = {
   },
 };
 
-async function callTool(name: string, args: Record<string, unknown>): Promise<string> {
+async function callTool(
+  name: string,
+  args: Record<string, unknown>,
+  onStatus?: (status: string) => void,
+): Promise<string> {
   if (name === "search_web") {
-    const results = await invoke<SearchResult[]>("search_web", {
-      query: String(args.query ?? ""),
-    });
+    const query = String(args.query ?? "");
+    onStatus?.(`Web検索中: ${query}`);
+    const results = await invoke<SearchResult[]>("search_web", { query });
     return JSON.stringify(results);
   }
   return JSON.stringify({ error: `unknown tool: ${name}` });
@@ -40,6 +44,7 @@ export async function chatWithTools(
   ollamaUrl: string,
   model: string,
   initialMessages: ChatMessage[],
+  onStatus?: (status: string) => void,
 ): Promise<string> {
   const messages = [...initialMessages];
 
@@ -68,7 +73,7 @@ export async function chatWithTools(
 
     messages.push(message);
     for (const call of message.tool_calls) {
-      const result = await callTool(call.function.name, call.function.arguments);
+      const result = await callTool(call.function.name, call.function.arguments, onStatus);
       messages.push({ role: "tool", content: result });
     }
   }

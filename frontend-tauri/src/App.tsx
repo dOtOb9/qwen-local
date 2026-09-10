@@ -51,6 +51,7 @@ function App() {
     null,
   );
   const [attaching, setAttaching] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
 
@@ -250,7 +251,13 @@ function App() {
       }
       chatMessages.push(...nextMessages.map((m) => ({ role: m.role, content: m.content })));
 
-      const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages);
+      const assistantContent = await chatWithTools(
+        OLLAMA_URL,
+        MODEL,
+        chatMessages,
+        setToolStatus,
+      );
+      setToolStatus(null);
 
       setMessages((prev) => [
         ...prev,
@@ -270,6 +277,7 @@ function App() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setToolStatus(null);
     }
   }
 
@@ -359,7 +367,11 @@ function App() {
                 </div>
                 );
               })}
-              {loading && <div className="text-sm text-muted-foreground">考え中...</div>}
+              {loading && (
+                <div className="text-sm text-muted-foreground">
+                  {toolStatus ?? "考え中..."}
+                </div>
+              )}
             </div>
           </ScrollArea>
         </Card>
