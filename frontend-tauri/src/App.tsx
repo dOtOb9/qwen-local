@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -21,6 +24,11 @@ import {
 } from "@/lib/db";
 import { checkForUpdateAndInstall } from "@/lib/updater";
 import { chatWithTools } from "@/lib/ollama";
+import {
+  buildAttachedFileMessage,
+  extractPdfText,
+  parseAttachedFileMessage,
+} from "@/lib/pdf";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -37,6 +45,32 @@ function App() {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [rememberStatus, setRememberStatus] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; text: string } | null>(
+    null,
+  );
+  const [attaching, setAttaching] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  useEffect(() => {
+    const unlistenPromise = getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "enter") {
+        setIsDraggingFile(true);
+      } else if (event.payload.type === "leave") {
+        setIsDraggingFile(false);
+      } else if (event.payload.type === "drop") {
+        setIsDraggingFile(false);
+        const pdfPath = event.payload.paths.find((p) => p.toLowerCase().endsWith(".pdf"));
+        if (pdfPath) {
+          attachPdfFromPath(pdfPath);
+        } else {
+          setError("PDFファイルのみ添付できます");
+        }
+      }
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, []);
 
   useEffect(() => {
     getVersion().then(setAppVersion);
@@ -105,6 +139,30 @@ function App() {
     setMemories((prev) => prev.filter((m) => m.id !== id));
   }
 
+  async function attachPdfFromPath(path: string) {
+    setAttaching(true);
+    setError(null);
+    try {
+      const bytes = await readFile(path);
+      const text = await extractPdfText(bytes);
+      const name = path.split(/[\\/]/).pop() ?? path;
+      setAttachedFile({ name, text });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  async function handleAttachPdf() {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!path || typeof path !== "string") return;
+    await attachPdfFromPath(path);
+  }
+
   async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
@@ -118,9 +176,12 @@ function App() {
       return;
     }
 
+    const fileToSend = attachedFile;
+
     setLoading(true);
     setError(null);
     setInput("");
+    setAttachedFile(null);
 
     try {
       let sessionId = activeSessionId;
@@ -132,16 +193,20 @@ function App() {
         setActiveSessionId(sessionId);
       }
 
+      const content = fileToSend
+        ? buildAttachedFileMessage(fileToSend.name, fileToSend.text, text)
+        : text;
+
       const userMessage: StoredMessage = {
         id: -1,
         session_id: sessionId,
         role: "user",
-        content: text,
+        content,
         created_at: Date.now(),
       };
       const nextMessages = [...messages, userMessage];
       setMessages(nextMessages);
-      await addMessage(sessionId, "user", text);
+      await addMessage(sessionId, "user", content);
 
       const chatMessages: { role: string; content: string }[] = [];
       if (memories.length > 0) {
@@ -200,10 +265,22 @@ function App() {
           </p>
         )}
 
-        <Card className="flex-1 overflow-hidden p-0">
-          <ScrollArea className="h-full p-4">
+        <Card
+          className={
+            "flex-1 overflow-hidden p-0 transition-colors " +
+            (isDraggingFile ? "ring-2 ring-primary" : "")
+          }
+        >
+          {isDraggingFile && (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              PDFをここにドロップ
+            </div>
+          )}
+          <ScrollArea className={"h-full p-4" + (isDraggingFile ? " hidden" : "")}>
             <div className="flex flex-col gap-3">
-              {messages.map((m, i) => (
+              {messages.map((m, i) => {
+                const attachment = m.role === "user" ? parseAttachedFileMessage(m.content) : null;
+                return (
                 <div
                   key={i}
                   className={
@@ -220,13 +297,20 @@ function App() {
                   >
                     {m.role === "assistant" ? (
                       <MessageContent content={m.content} />
+                    ) : attachment ? (
+                      <>
+                        <div className="mb-1 inline-flex items-center gap-1 rounded bg-primary-foreground/20 px-1.5 py-0.5 text-xs">
+                          📄 {attachment.filename}
+                        </div>
+                        <div>{attachment.question}</div>
+                      </>
                     ) : (
                       m.content
                     )}
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleRememberText(m.content)}
+                    onClick={() => handleRememberText(attachment ? attachment.question : m.content)}
                     className="absolute -top-2 hidden rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm hover:text-foreground group-hover:block"
                     style={m.role === "user" ? { left: "-0.25rem" } : { right: "-0.25rem" }}
                     title="このメッセージを長期記憶に保存"
@@ -234,7 +318,8 @@ function App() {
                     覚える
                   </button>
                 </div>
-              ))}
+                );
+              })}
               {loading && <div className="text-sm text-muted-foreground">考え中...</div>}
             </div>
           </ScrollArea>
@@ -245,6 +330,19 @@ function App() {
           <p className="text-sm text-muted-foreground">{rememberStatus}</p>
         )}
 
+        {attachedFile && (
+          <div className="flex items-center gap-2 self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+            📄 {attachedFile.name}
+            <button
+              type="button"
+              onClick={() => setAttachedFile(null)}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -252,13 +350,27 @@ function App() {
             sendMessage();
           }}
         >
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handleAttachPdf}
+            disabled={loading || attaching}
+            title="PDFを添付"
+          >
+            📎
+          </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
-            placeholder="メッセージを入力... (/remember で長期記憶に保存)"
-            disabled={loading}
+            placeholder={
+              attaching
+                ? "PDFを読み込み中..."
+                : "メッセージを入力... (/remember で長期記憶に保存)"
+            }
+            disabled={loading || attaching}
           />
-          <Button type="submit" disabled={loading || !input.trim()}>
+          <Button type="submit" disabled={loading || attaching || !input.trim()}>
             送信
           </Button>
         </form>

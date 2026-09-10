@@ -293,9 +293,27 @@ Tauriのwebviewは`<a href>`クリックをデフォルトでアプリ内遷移�
 (プラグイン自体はテンプレートに元々入っていたので追加インストール不要、
 `opener:default`権限にも`allow-open-url`が最初から含まれていた)。
 
+## 長期記憶ポップアップ化 + PDFアップロード(ドラッグ&ドロップ対応)
+
+- 長期記憶: サイドバーの小さい欄が使いにくかったため、shadcn Dialog +
+  Badgeで独立したポップアップ(`MemoryDialog.tsx`)に移設。
+- PDFアップロード: `pdfjs-dist`でPDFのテキストをフロント側で抽出
+  (`src/lib/pdf.ts`)。📎ボタンからの選択と、ウィンドウへのドラッグ&ドロップの
+  両方に対応。
+  - ドラッグ&ドロップの実装メモ: Tauriのwebviewはブラウザ標準のHTML5 DnD
+    イベント(`ondrop`等)を素通りさせず、OSレベルのファイルドロップとして
+    横取りする。ブラウザの`dataTransfer.files`ではなく、
+    `@tauri-apps/api/webview`の`getCurrentWebview().onDragDropEvent()`
+    (`enter`/`drop`/`leave`イベント、`drop`時に実ファイルパスの配列が渡る)を
+    使う必要がある。取得したパスは📎ボタン経由の添付と同じ
+    `readFile` + `extractPdfText`処理を共通関数化(`attachPdfFromPath`)して再利用。
+  - アップロードしたPDFの内容はメッセージ本文に埋め込んで永続化しつつ
+    (セッション内で後から参照できるように)、チャット欄の表示は
+    「📄 ファイル名 + 質問文」だけのコンパクトな表示にするパース処理
+    (`parseAttachedFileMessage`)を実装。
+
 ## 次にやること
 
-- ファイルアップロード対応(PDF読み込み)に着手する
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
 - (保留) Ollama同梱(sidecar)案の実装
 - PC再起動後、OllamaのOLLAMA_ORIGINS設定が自動起動時にも効いているか確認する

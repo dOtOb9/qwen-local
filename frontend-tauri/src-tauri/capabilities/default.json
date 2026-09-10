@@ -9,6 +9,9 @@
     "sql:default",
     "sql:allow-execute",
     "updater:default",
-    "process:default"
+    "process:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-read-file"
   ]
 }
