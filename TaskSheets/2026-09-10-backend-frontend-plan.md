@@ -40,6 +40,15 @@ Tauri製デスクトップアプリから利用できるようにする。
 
 - 14Bモデルを常用するかは、M1でのVRAM実測結果を見て判断する。
 
+## 進捗
+
+- 2026-09-10: M1完了。winget経由でOllama 0.34.0をインストール。
+  `qwen2.5:7b-instruct` (q4量子化, 4.7GB) をpullし、`ollama ps`で
+  `PROCESSOR: 100% GPU`を確認(RTX4070, VRAM使用量5.6GB/12.3GB)。
+  日本語プロンプトへの応答も正常(Alibaba Cloud製と正しく自己紹介)。
+  - 注意点: Bashツールのコマンドに直接日本語を書くと文字化けすることがある。
+    ファイルに書いてから`curl --data-binary @file`で送ると安定する。
+
 ## 次にやること
 
-- M1: Ollamaインストールと `qwen2.5:7b-instruct` の動作確認
+- M2: `frontend-tauri/` の雛形作成 (Tauri + React + TS + shadcn/ui) とOllama API疎通確認
