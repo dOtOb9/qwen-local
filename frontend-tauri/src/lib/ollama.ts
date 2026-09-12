@@ -146,6 +146,20 @@ async function callTool(
   return JSON.stringify({ error: `unknown tool: ${name}` });
 }
 
+/**
+ * Ollamaの `/api/tags` を叩き、ローカルにpull済みのモデル名一覧を返す。
+ * Ollama未起動時などは例外を投げるので、呼び出し側でフォールバックすること。
+ */
+export async function fetchAvailableModels(ollamaUrl: string): Promise<string[]> {
+  const res = await fetch(`${ollamaUrl}/api/tags`);
+  if (!res.ok) {
+    throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  const models = data.models as { name: string }[] | undefined;
+  return (models ?? []).map((m) => m.name);
+}
+
 const MAX_TOOL_ROUNDS = 3;
 
 /**
