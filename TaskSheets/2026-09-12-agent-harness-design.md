@@ -168,6 +168,27 @@ Issue #1はクローズ済み。
 残り: Issue #2(モデル切り替え)、#3(System Prompt設定)、#4(Google Calendar連携)
 が`agent-ready`のまま残っている。6時間おきのcronで今後自動的に拾われる見込み。
 
+## CI Doctor: Actions失敗時の自動診断・修正(2026-09-12)
+
+「Actionsが失敗したら自動で直すActionsを作りたい」という要望を受け、
+`.github/workflows/ci-doctor.yml`を追加。`Agent Dev Loop`または
+`Windows Build Check (PR)`が失敗した時に`workflow_run`トリガーで起動する。
+
+**重要な制約**: Bot/Claude GitHub Appのトークンには`.github/workflows/`配下の
+ファイルをpushする権限が無い(GitHubの仕様上、ワークフローファイルの変更には
+特別な`workflow`スコープが必要でBotトークンには付与されない)。そのため:
+
+- **原因がアプリコード(`frontend-tauri/`配下)の場合**: 元のPRブランチに
+  直接修正をpushし、`gh pr comment`で報告する(新しいブランチは作らない)
+- **原因がワークフロー設定自体の場合**: 直接修正はできないため、
+  `TaskSheets/`に原因の切り分けと具体的な修正案(修正後のyaml断片込み)を
+  書いてpushし、該当PR/Issueに「人間の対応が必要」とコメントする
+  (実際、今日ハマった3つの不具合—Windowsランナー非対応、allowedToolsの
+  スコープ構文、max-turns不足—は全てこのパターンだった)
+
+同じ失敗への無限リトライを防ぐため、`ci-doctor-attempted`ラベルをPRに
+付けて1PRにつき1回までに制限している。
+
 ## 実行場所についての結論
 
 このハーネスを駆動するのはOllamaではなくClaude Code自身（コーディング

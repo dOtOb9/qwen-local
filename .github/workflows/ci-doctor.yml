@@ -1,0 +1,128 @@
+name: CI Doctor
+
+on:
+  workflow_run:
+    workflows:
+      - "Agent Dev Loop"
+      - "Windows Build Check (PR)"
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  find-pr:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.lookup.outputs.pr_number }}
+      already_attempted: ${{ steps.lookup.outputs.already_attempted }}
+    steps:
+      - id: lookup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          PR_JSON=$(gh pr list --repo dOtOb9/qwen-local --head "$BRANCH" --state open --json number,labels)
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR_NUMBER" ]; then
+            HAS_LABEL=$(echo "$PR_JSON" | jq -r '.[0].labels[]?.name' | grep -c '^ci-doctor-attempted$' || true)
+            echo "already_attempted=$([ "$HAS_LABEL" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_attempted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  fix:
+    needs: find-pr
+    if: needs.find-pr.outputs.already_attempted != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install frontend dependencies
+        working-directory: frontend-tauri
+        run: npm ci
+
+      - name: Mark PR as attempted (avoid retry loops)
+        if: needs.find-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit ${{ needs.find-pr.outputs.pr_number }} --repo dOtOb9/qwen-local --add-label ci-doctor-attempted
+
+      - name: Diagnose and fix the CI failure
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(cargo:*),Edit,Write,Read,Glob,Grep"
+            --max-turns 40
+          prompt: |
+            GitHub Actionsのワークフロー「${{ github.event.workflow_run.name }}」が
+            失敗しました(run ID: ${{ github.event.workflow_run.id }}、
+            ブランチ: ${{ github.event.workflow_run.head_branch }}、
+            対応するPR番号: ${{ needs.find-pr.outputs.pr_number }} (空なら該当PR無し))。
+
+            ## 手順
+            1. `gh run view ${{ github.event.workflow_run.id }} --log-failed` で
+               失敗原因を調査する。
+            2. 原因を切り分ける:
+
+               **a) `frontend-tauri/` 配下のアプリケーションコードが原因の場合**
+               現在チェックアウト済みの `${{ github.event.workflow_run.head_branch }}`
+               ブランチ上で直接修正する。`frontend-tauri/`で`npm run build`、
+               `frontend-tauri/src-tauri/`で`cargo build`を実行して確認したうえで、
+               変更したファイルだけを明示的に`git add`してcommitし、
+               このブランチにそのままpushする(新しいブランチは作らない、
+               `git add -A`は使わない)。PR番号が空でなければ
+               `gh pr comment <PR番号>`で修正内容を報告する。
+
+               **b) `.github/workflows/` 配下の設定自体が原因の場合**
+               このワークフロー自身にはworkflowファイルを変更してpushする権限が
+               無いため(GitHubの仕様上の制約)、直接の修正はできない。代わりに:
+               - `TaskSheets/2026-09-12-ci-failure-<ワークフロー名の英語slug>.md`
+                 に、規定のテンプレート(タイトル/日付/ステータス/目的/やったこと/
+                 次にやること)で、原因の切り分け結果と、どのファイルの
+                 どの部分をどう直すべきかの具体的な修正案(該当yaml断片を
+                 修正後の形で載せる)を書く。同名ファイルが既にあれば
+                 上書きせず追記する。
+               - このTaskSheetファイルだけをcommitし、`master`に直接pushする
+                 (ワークフロー以外のドキュメントなので直接pushしてよい)。
+               - PR番号が空でなければ`gh pr comment <PR番号>`、空であれば
+                 適当な`agent-ready`または関連Issueへの`gh issue comment`で、
+                 「ワークフロー設定の修正が必要なため人間の対応待ち。詳細は
+                 該当TaskSheet参照」と報告する。
+
+               **c) 原因が特定できない場合**
+               ケースbと同様にTaskSheetに調査結果だけを書き残す(嘘の結論を
+               書かない)。
+
+            ## 厳守事項(ガードレール)
+            - `master`への直接pushは、TaskSheetのみの変更の場合に限り許可する。
+              コード修正は必ず元のPRブランチへのpushに留める。
+            - `.github/workflows/`配下のファイルは変更しない(権限が無く、
+              変更を試みても失敗する)。
+            - 依存関係の破壊的アップグレード、バージョン/リリースタグの操作、
+              シークレット・トークンの扱いを変更する変更はしない。
+            - 1回の実行での修正試行は1回まで。直せなければ無理をせず
+              人間に報告して終了する。
