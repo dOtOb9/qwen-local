@@ -52,6 +52,7 @@ function App() {
   );
   const [attaching, setAttaching] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
 
@@ -266,6 +267,7 @@ function App() {
         getSetting("google_client_secret"),
         getSetting("google_refresh_token"),
       ]);
+      setStreamingContent("");
       const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages, {
         rakutenAppId: rakutenAppId ?? undefined,
         vivaldiEmail: vivaldiEmail ?? undefined,
@@ -273,9 +275,14 @@ function App() {
         googleClientId: googleClientId ?? undefined,
         googleClientSecret: googleClientSecret ?? undefined,
         googleRefreshToken: googleRefreshToken ?? undefined,
-        onStatus: setToolStatus,
+        onStatus: (status) => {
+          setToolStatus(status);
+          setStreamingContent("");
+        },
+        onToken: setStreamingContent,
       });
       setToolStatus(null);
+      setStreamingContent("");
 
       setMessages((prev) => [
         ...prev,
@@ -296,6 +303,7 @@ function App() {
     } finally {
       setLoading(false);
       setToolStatus(null);
+      setStreamingContent("");
     }
   }
 
@@ -385,10 +393,16 @@ function App() {
                 </div>
                 );
               })}
-              {loading && (
-                <div className="text-sm text-muted-foreground">
-                  {toolStatus ?? "考え中..."}
+              {loading && toolStatus && (
+                <div className="text-sm text-muted-foreground">{toolStatus}</div>
+              )}
+              {loading && !toolStatus && streamingContent && (
+                <div className="max-w-[85%] self-start rounded-lg bg-muted px-3 py-2 text-foreground">
+                  <MessageContent content={streamingContent} />
                 </div>
+              )}
+              {loading && !toolStatus && !streamingContent && (
+                <div className="text-sm text-muted-foreground">考え中...</div>
               )}
             </div>
           </ScrollArea>
