@@ -1,12 +1,5 @@
-import {
-  HOKKAIDO_PATH,
-  HONSHU_PATH,
-  KYUSHU_PATH,
-  MAP_HEIGHT,
-  MAP_WIDTH,
-  SHIKOKU_PATH,
-  project,
-} from "@/lib/japanProjection";
+import japanMapSvg from "@/assets/japan-map.svg?raw";
+import { MAP_VIEWBOX, project } from "@/lib/japanProjection";
 import type { EarthquakeInfo } from "@/lib/earthquake";
 
 type EarthquakeViewProps = {
@@ -29,45 +22,39 @@ export function EarthquakeView({ history }: EarthquakeViewProps) {
   const located = history.filter((q) => q.latitude !== null && q.longitude !== null);
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <h2 className="text-lg font-semibold">地震情報(リアルタイム)</h2>
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
+      <h1 className="text-xl font-semibold">地震情報(リアルタイム)</h1>
 
       <div className="flex justify-center rounded-lg bg-muted/30 p-4">
-        <svg
-          viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-          className="h-[420px] w-auto"
-          role="img"
-          aria-label="日本地図と地震の震源"
-        >
-          <g className="fill-muted-foreground/25 stroke-muted-foreground/40" strokeWidth={1}>
-            <path d={HOKKAIDO_PATH} />
-            <path d={HONSHU_PATH} />
-            <path d={SHIKOKU_PATH} />
-            <path d={KYUSHU_PATH} />
-          </g>
-
-          {located.map((q, i) => {
-            const { x, y } = project(q.latitude!, q.longitude!);
-            const color = colorForScale(q.maxScale);
-            const isLatest = i === located.length - 1;
-            return (
-              <g key={q.id}>
-                {isLatest && (
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={4}
-                    fill="none"
-                    stroke={color}
-                    strokeWidth={2}
-                    className="eq-ripple"
-                  />
-                )}
-                <circle cx={x} cy={y} r={4} fill={color} stroke="white" strokeWidth={1} />
-              </g>
-            );
-          })}
-        </svg>
+        <div className="relative h-[560px] w-[440px]">
+          <div
+            className="absolute inset-0 [&>svg]:h-full [&>svg]:w-full"
+            dangerouslySetInnerHTML={{ __html: japanMapSvg }}
+          />
+          <svg viewBox={MAP_VIEWBOX} className="absolute inset-0 h-full w-full">
+            {located.map((q, i) => {
+              const { x, y } = project(q.latitude!, q.longitude!);
+              const color = colorForScale(q.maxScale);
+              const isLatest = i === located.length - 1;
+              return (
+                <g key={q.id}>
+                  {isLatest && (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={6}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={3}
+                      className="eq-ripple"
+                    />
+                  )}
+                  <circle cx={x} cy={y} r={6} fill={color} stroke="white" strokeWidth={1.5} />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
       <style>{`
         .eq-ripple {
@@ -76,13 +63,13 @@ export function EarthquakeView({ history }: EarthquakeViewProps) {
           animation: eq-ripple-anim 2.2s ease-out infinite;
         }
         @keyframes eq-ripple-anim {
-          0% { r: 4; opacity: 0.9; }
-          100% { r: 60; opacity: 0; }
+          0% { r: 6; opacity: 0.9; }
+          100% { r: 90; opacity: 0; }
         }
       `}</style>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-muted-foreground">直近の地震</h3>
+        <h2 className="text-sm font-semibold text-muted-foreground">直近の地震</h2>
         {history.length === 0 && (
           <p className="text-sm text-muted-foreground">まだ観測情報がありません</p>
         )}

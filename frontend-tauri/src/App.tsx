@@ -33,6 +33,7 @@ import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/li
 import { getSetting } from "@/lib/db";
 import { watchEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
 import { EarthquakeView } from "@/components/EarthquakeView";
+import { Dock } from "@/components/Dock";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -320,7 +321,19 @@ function App() {
     }
   }
 
+  if (activeTab === "earthquake") {
+    return (
+      <>
+        <div className="h-screen pb-20">
+          <EarthquakeView history={earthquakeHistory} />
+        </div>
+        <Dock active={activeTab} onSelect={setActiveTab} />
+      </>
+    );
+  }
+
   return (
+    <>
     <div className="flex h-screen">
       <Sidebar
         sessions={sessions}
@@ -333,40 +346,14 @@ function App() {
         onDeleteMemory={handleDeleteMemory}
       />
 
-      <main className="flex h-screen flex-1 flex-col gap-4 p-4">
+      <main className="flex h-screen flex-1 flex-col gap-4 p-4 pb-20">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
           {appVersion && (
             <span className="text-xs text-muted-foreground">v{appVersion}</span>
           )}
-          <div className="ml-auto flex gap-1 rounded-md bg-muted p-0.5">
-            <button
-              type="button"
-              onClick={() => setActiveTab("chat")}
-              className={
-                "rounded px-3 py-1 text-sm " +
-                (activeTab === "chat" ? "bg-background shadow-sm" : "text-muted-foreground")
-              }
-            >
-              チャット
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("earthquake")}
-              className={
-                "rounded px-3 py-1 text-sm " +
-                (activeTab === "earthquake" ? "bg-background shadow-sm" : "text-muted-foreground")
-              }
-            >
-              地震情報
-            </button>
-          </div>
         </div>
 
-        {activeTab === "earthquake" ? (
-          <EarthquakeView history={earthquakeHistory} />
-        ) : (
-          <>
         {updateStatus && (
           <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             {updateStatus}
@@ -513,10 +500,10 @@ function App() {
             送信
           </Button>
         </form>
-          </>
-        )}
       </main>
     </div>
+    <Dock active={activeTab} onSelect={setActiveTab} />
+    </>
   );
 }
 
