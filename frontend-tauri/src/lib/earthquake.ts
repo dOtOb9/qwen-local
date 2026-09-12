@@ -38,6 +38,40 @@ type RawQuakeMessage = {
   };
 };
 
+function toEarthquakeInfo(data: RawQuakeMessage & { id?: string }): EarthquakeInfo | null {
+  if (!data.earthquake) return null;
+  const maxScale = data.earthquake.maxScale ?? 0;
+  const lat = data.earthquake.hypocenter?.latitude;
+  const lon = data.earthquake.hypocenter?.longitude;
+  return {
+    id: data.id ?? `${data.earthquake.time}-${Math.random()}`,
+    time: data.earthquake.time,
+    hypocenterName: data.earthquake.hypocenter?.name ?? "不明",
+    latitude: typeof lat === "number" && lat !== -200 ? lat : null,
+    longitude: typeof lon === "number" && lon !== -200 ? lon : null,
+    magnitude: data.earthquake.hypocenter?.magnitude ?? 0,
+    maxScale,
+    maxScaleLabel: scaleLabel(maxScale),
+    tsunami: data.earthquake.domesticTsunami
+      ? data.earthquake.domesticTsunami !== "None"
+      : false,
+  };
+}
+
+/** One-off fetch of recent past earthquake reports, oldest first, to seed the UI on load. */
+export async function fetchRecentEarthquakes(
+  minScale = 10,
+  limit = 10,
+): Promise<EarthquakeInfo[]> {
+  const res = await fetch(`https://api.p2pquake.net/v2/history?codes=551&limit=${limit}`);
+  if (!res.ok) return [];
+  const data: (RawQuakeMessage & { id?: string })[] = await res.json();
+  return data
+    .map(toEarthquakeInfo)
+    .filter((q): q is EarthquakeInfo => q !== null && q.maxScale >= minScale)
+    .reverse();
+}
+
 /**
  * Connects to P2P地震情報's public real-time feed (free, no auth) and calls
  * onQuake for every earthquake report (code 551) whose maxScale meets
@@ -45,7 +79,7 @@ type RawQuakeMessage = {
  */
 export function watchEarthquakes(
   onQuake: (quake: EarthquakeInfo) => void,
-  minScale = 20,
+  minScale = 10,
 ): () => void {
   let closedByUs = false;
   let ws: WebSocket | null = null;

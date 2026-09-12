@@ -31,12 +31,19 @@ import {
 } from "@/lib/pdf";
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
 import { getSetting } from "@/lib/db";
-import { watchEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
+import { watchEarthquakes, fetchRecentEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
 import { EarthquakeView } from "@/components/EarthquakeView";
 import { Dock } from "@/components/Dock";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
+// 表示(地図・履歴)は震度1から、実際のデスクトップ通知はうるさくなりすぎないよう震度3から。
+const NOTIFY_MIN_SCALE = 30;
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -63,9 +70,32 @@ function App() {
   const [activeTab, setActiveTab] = useState<"chat" | "earthquake">("chat");
 
   useEffect(() => {
+    fetchRecentEarthquakes().then((history) => {
+      if (history.length > 0) setEarthquakeHistory(history);
+    });
+
+    (async () => {
+      let granted = await isPermissionGranted();
+      if (!granted) {
+        granted = (await requestPermission()) === "granted";
+      }
+    })();
+
     const stopWatching = watchEarthquakes((quake) => {
       setEarthquakeAlert(quake);
       setEarthquakeHistory((prev) => [...prev, quake].slice(-30));
+
+      if (quake.maxScale >= NOTIFY_MIN_SCALE) {
+        isPermissionGranted().then((granted) => {
+          if (!granted) return;
+          sendNotification({
+            title: `地震情報: ${quake.maxScaleLabel}`,
+            body: `${quake.hypocenterName} M${quake.magnitude || "不明"}${
+              quake.tsunami ? "・津波の可能性あり" : ""
+            }`,
+          });
+        });
+      }
     });
     return stopWatching;
   }, []);
