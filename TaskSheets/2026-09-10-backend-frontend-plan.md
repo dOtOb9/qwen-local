@@ -356,8 +356,41 @@ GitHub Actionsの定期実行でクラウドのClaude Codeが実装してPRを�
   cron + 「ラベル付きIssueを実装してPRを出す」ワークフローの内容を詰める
   作業待ち。
 
+## 方向性: 「秘書」化構想と楽天検索の実装
+
+ユーザーから「Gmail・Vivaldi.net・銀行口座を見てくれる秘書のようなアプリにしたい」
+という大きな方向性の提案があった。リスク・難易度別に整理して合意:
+
+- **楽天商品検索**: 難易度低、公式無料APIあり。Amazonは商品検索APIの利用に
+  アフィリエイト実績が必要(実質課金相当)なため、楽天を採用する判断。
+- **Gmail**: Google Cloud ConsoleでのOAuthクライアント作成(ユーザー側の
+  一手間)が必要だが、公式APIで安全に実装可能。今回は未着手、次の調査対象。
+- **Vivaldi.net**: 標準IMAPで見られる可能性が高いが未調査。
+- **銀行口座**: 明確にリスクを指摘して合意。銀行ログインページの直接自動操作
+  (スクレイピング)は行わない方針。やるならMoney Forward MEやMoneytreeなど、
+  銀行と正式に提携したOpen Banking API経由のアグリゲーターを使う想定
+  (これも未着手)。
+
+まず楽天商品検索を実装。
+- Rust側 (`src-tauri/src/rakuten.rs`): `search_rakuten(application_id, query)`
+  コマンドを追加。楽天市場商品検索API
+  (`IchibaItem/Search/20220601`)をreqwestで直接叩く。
+- フロント側 (`src/lib/ollama.ts`): `ToolContext`型を導入して
+  `rakutenAppId`/`onStatus`をまとめ、Rakuten Application IDが設定されている
+  時だけ`search_rakuten`ツールをOllamaに提示する(未設定なら存在しないツール
+  として扱われ、混乱を避ける)。
+- Application IDは`settings`テーブルに保存(`SettingsDialog.tsx`に入力欄追加)。
+  Rakuten DevelopersでApplication ID発行はユーザー本人が行う必要がある
+  (無料、アカウント登録のみ)。
+- ついでにツール実行中のステータス表示(「Web検索中: …」)を`chatWithTools`に
+  `onStatus`コールバックとして追加(ユーザー要望)。
+
 ## 次にやること
 
+- Rakuten Application IDを発行してもらい、実際に商品検索が動くか確認する
+- Gmail連携の調査(OAuthクライアント作成手順の整理)
+- Vivaldi.netがIMAP等でアクセス可能か調査
+- 銀行口座連携: Money Forward ME等の公式連携APIの調査(直接スクレイピングはしない)
 - (ユーザー対応待ち) `/install-github-app`の実行、およびcronワークフローの内容確定
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
 - (保留) Ollama同梱(sidecar)案の実装

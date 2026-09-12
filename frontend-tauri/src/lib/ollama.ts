@@ -6,7 +6,13 @@ export type ChatMessage = {
   tool_calls?: { function: { name: string; arguments: Record<string, unknown> } }[];
 };
 
+export type ToolContext = {
+  rakutenAppId?: string;
+  onStatus?: (status: string) => void;
+};
+
 type SearchResult = { title: string; url: string; snippet: string };
+type RakutenItem = { name: string; price: number; url: string; shop: string };
 
 const SEARCH_TOOL = {
   type: "function",
@@ -24,15 +30,41 @@ const SEARCH_TOOL = {
   },
 };
 
+const RAKUTEN_TOOL = {
+  type: "function",
+  function: {
+    name: "search_rakuten",
+    description:
+      "商品の価格を調べたい、買い物・購入を検討している時に楽天市場で商品を検索する。" +
+      "価格比較や商品提案が必要な場面で使う。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "検索したい商品名・キーワード" },
+      },
+      required: ["query"],
+    },
+  },
+};
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
-  onStatus?: (status: string) => void,
+  ctx: ToolContext,
 ): Promise<string> {
   if (name === "search_web") {
     const query = String(args.query ?? "");
-    onStatus?.(`Web検索中: ${query}`);
+    ctx.onStatus?.(`Web検索中: ${query}`);
     const results = await invoke<SearchResult[]>("search_web", { query });
+    return JSON.stringify(results);
+  }
+  if (name === "search_rakuten" && ctx.rakutenAppId) {
+    const query = String(args.query ?? "");
+    ctx.onStatus?.(`楽天市場で検索中: ${query}`);
+    const results = await invoke<RakutenItem[]>("search_rakuten", {
+      applicationId: ctx.rakutenAppId,
+      query,
+    });
     return JSON.stringify(results);
   }
   return JSON.stringify({ error: `unknown tool: ${name}` });
@@ -44,9 +76,10 @@ export async function chatWithTools(
   ollamaUrl: string,
   model: string,
   initialMessages: ChatMessage[],
-  onStatus?: (status: string) => void,
+  ctx: ToolContext = {},
 ): Promise<string> {
   const messages = [...initialMessages];
+  const tools = ctx.rakutenAppId ? [SEARCH_TOOL, RAKUTEN_TOOL] : [SEARCH_TOOL];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await fetch(`${ollamaUrl}/api/chat`, {
@@ -55,7 +88,7 @@ export async function chatWithTools(
       body: JSON.stringify({
         model,
         messages,
-        tools: [SEARCH_TOOL],
+        tools,
         stream: false,
       }),
     });
@@ -73,7 +106,7 @@ export async function chatWithTools(
 
     messages.push(message);
     for (const call of message.tool_calls) {
-      const result = await callTool(call.function.name, call.function.arguments, onStatus);
+      const result = await callTool(call.function.name, call.function.arguments, ctx);
       messages.push({ role: "tool", content: result });
     }
   }

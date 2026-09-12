@@ -1,4 +1,5 @@
 mod github;
+mod rakuten;
 mod search;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -53,7 +54,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             search::search_web,
-            github::create_github_issue
+            github::create_github_issue,
+            rakuten::search_rakuten
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

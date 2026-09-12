@@ -251,12 +251,11 @@ function App() {
       }
       chatMessages.push(...nextMessages.map((m) => ({ role: m.role, content: m.content })));
 
-      const assistantContent = await chatWithTools(
-        OLLAMA_URL,
-        MODEL,
-        chatMessages,
-        setToolStatus,
-      );
+      const rakutenAppId = (await getSetting("rakuten_app_id")) ?? undefined;
+      const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages, {
+        rakutenAppId,
+        onStatus: setToolStatus,
+      });
       setToolStatus(null);
 
       setMessages((prev) => [

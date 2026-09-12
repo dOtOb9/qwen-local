@@ -14,17 +14,20 @@ export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
   const [repo, setRepo] = useState("dOtOb9/qwen-local");
+  const [rakutenAppId, setRakutenAppId] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [savedToken, savedRepo] = await Promise.all([
+      const [savedToken, savedRepo, savedRakutenAppId] = await Promise.all([
         getSetting("github_token"),
         getSetting("github_repo"),
+        getSetting("rakuten_app_id"),
       ]);
       setToken(savedToken ?? "");
       setRepo(savedRepo ?? "dOtOb9/qwen-local");
+      setRakutenAppId(savedRakutenAppId ?? "");
     })();
   }, [open]);
 
@@ -32,6 +35,7 @@ export function SettingsDialog() {
     await Promise.all([
       setSetting("github_token", token.trim()),
       setSetting("github_repo", repo.trim()),
+      setSetting("rakuten_app_id", rakutenAppId.trim()),
     ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -66,6 +70,17 @@ export function SettingsDialog() {
               Issue投稿先リポジトリ (owner/repo)
             </label>
             <Input value={repo} onChange={(e) => setRepo(e.currentTarget.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">
+              楽天ウェブサービス Application ID
+            </label>
+            <Input
+              type="password"
+              value={rakutenAppId}
+              onChange={(e) => setRakutenAppId(e.currentTarget.value)}
+              placeholder="1234567890123456789"
+            />
           </div>
           <Button onClick={save}>{saved ? "保存しました" : "保存"}</Button>
         </div>
