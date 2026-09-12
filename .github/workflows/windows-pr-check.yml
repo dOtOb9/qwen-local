@@ -1,0 +1,30 @@
+name: Windows Build Check (PR)
+
+on:
+  pull_request:
+    paths:
+      - "frontend-tauri/**"
+
+jobs:
+  windows-build-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: frontend-tauri
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend-tauri
+        run: npm run build
+
+      - name: Build Rust (Tauri) backend
+        working-directory: frontend-tauri/src-tauri
+        run: cargo build

@@ -59,7 +59,10 @@ jobs:
             5. Issue本文の要求を実装する。対象は主に `frontend-tauri/src/`
                (TypeScript/React) と `frontend-tauri/src-tauri/src/` (Rust)。
             6. `frontend-tauri/` で `npm run build`、`frontend-tauri/src-tauri/` で
-               `cargo build` を実行し、両方成功することを確認する。
+               `cargo build` を実行し、両方成功することを確認する
+               (これはLinuxランナー上での簡易コンパイル確認であり、実際にWindows
+               向けにビルドできる保証ではない。本物のWindows向けビルド確認は、
+               PR作成後に`windows-pr-check.yml`が自動実行して行う)。
                - 失敗したら原因を修正して再試行する(2回まで)。
                - それでも解決しない場合は、
                  `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-blocked`
