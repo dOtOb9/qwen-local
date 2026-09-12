@@ -85,11 +85,19 @@ jobs:
                  `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-blocked`
                  とし、詰まった理由を `gh issue comment <番号>` で説明して終了する
                  (中途半端な実装をpushしない)。
-            7. 成功したら、commitする前に必ず `git diff --stat` で変更ファイル
-               一覧を確認し、このIssueと無関係なファイルが含まれていないか
-               チェックする。含まれていたら`git checkout -- <該当ファイル>`
-               で元に戻してから、変更したファイルだけを明示的に`git add`
-               してコミットする(`git add -A`は使わない)。
+            7. 成功したら、commitする前に必ず `git status --short` で変更ファイル
+               一覧を確認する(`git diff --stat`は未追跡の新規ファイルや
+               既にstage済みの変更を見落とすため使わない)。このIssueと
+               無関係なファイルが含まれていないかチェックし、含まれていたら
+               元に戻す(既存の追跡ファイルの変更なら`git checkout -- <ファイル>`、
+               新規作成した無関係ファイルなら`rm <ファイル>`、既にstage済みなら
+               `git restore --staged <ファイル>`してから元に戻す)。
+               **ファイルを元に戻した場合は、必ずもう一度 `npm run build` /
+               `cargo build` を実行し直して壊れていないことを確認してから
+               commitする**(元に戻した内容が他のファイルの前提になっていた
+               可能性があるため。再ビルドが失敗したら手順6の失敗時対応に従う)。
+               その上で、変更したファイルだけを明示的に`git add`してコミット
+               する(`git add -A`は使わない)。
             8. `git push -u origin <ブランチ名>` でpushする。
             9. 以下の形式で「compare URL」を組み立てる(タイトル・本文はURLエンコードする。
                本文には `Closes #<番号>` を含める。GitHubの自動クローズは
