@@ -90,7 +90,7 @@ function App() {
           if (!granted) return;
           sendNotification({
             title: `地震情報: ${quake.maxScaleLabel}`,
-            body: `${quake.hypocenterName} M${quake.magnitude || "不明"}${
+            body: `${quake.time} ${quake.hypocenterName} M${quake.magnitude || "不明"}${
               quake.tsunami ? "・津波の可能性あり" : ""
             }`,
           });

@@ -39,15 +39,28 @@ export function EarthquakeView({ history }: EarthquakeViewProps) {
               return (
                 <g key={q.id}>
                   {isLatest && (
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={6}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={3}
-                      className="eq-ripple"
-                    />
+                    <>
+                      {/* P波(初期微動、約7km/s): 速く遠くまで届くが揺れは小さい */}
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={6}
+                        fill="none"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        className="eq-ripple-p"
+                      />
+                      {/* S波(主要動、約4km/s): 遅れて届くが本震の揺れそのもの */}
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={6}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={4}
+                        className="eq-ripple-s"
+                      />
+                    </>
                   )}
                   <circle cx={x} cy={y} r={6} fill={color} stroke="white" strokeWidth={1.5} />
                 </g>
@@ -57,14 +70,25 @@ export function EarthquakeView({ history }: EarthquakeViewProps) {
         </div>
       </div>
       <style>{`
-        .eq-ripple {
+        .eq-ripple-p, .eq-ripple-s {
           transform-origin: center;
           transform-box: fill-box;
-          animation: eq-ripple-anim 2.2s ease-out infinite;
         }
-        @keyframes eq-ripple-anim {
+        /* P波とS波は震源で同時に発生するが、速度比(約7:4)の分だけ
+           同じ時間でS波はP波より近い距離までしか届かない。 */
+        .eq-ripple-p {
+          animation: eq-ripple-p-anim 2.2s ease-out infinite;
+        }
+        .eq-ripple-s {
+          animation: eq-ripple-s-anim 2.2s ease-out infinite;
+        }
+        @keyframes eq-ripple-p-anim {
+          0% { r: 6; opacity: 0.8; }
+          100% { r: 110; opacity: 0; }
+        }
+        @keyframes eq-ripple-s-anim {
           0% { r: 6; opacity: 0.9; }
-          100% { r: 90; opacity: 0; }
+          100% { r: 63; opacity: 0; }
         }
       `}</style>
 
@@ -78,9 +102,12 @@ export function EarthquakeView({ history }: EarthquakeViewProps) {
             key={q.id}
             className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
           >
-            <span>
-              {q.hypocenterName} M{q.magnitude || "不明"}
-            </span>
+            <div className="flex flex-col">
+              <span>
+                {q.hypocenterName} M{q.magnitude || "不明"}
+              </span>
+              <span className="text-xs text-muted-foreground">{q.time}</span>
+            </div>
             <span className="font-medium" style={{ color: colorForScale(q.maxScale) }}>
               最大{q.maxScaleLabel}
             </span>
