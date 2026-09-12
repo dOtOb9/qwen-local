@@ -92,8 +92,9 @@ jobs:
                してコミットする(`git add -A`は使わない)。
             8. `git push -u origin <ブランチ名>` でpushする。
             9. 以下の形式で「compare URL」を組み立てる(タイトル・本文はURLエンコードする。
-               本文には `Refs #<番号>` を含める。`Fixes`/`Closes` は使わない。
-               マージ前にIssueが自動クローズされ、レビューが漏れるのを防ぐため):
+               本文には `Closes #<番号>` を含める。GitHubの自動クローズは
+               PRが実際にマージされた瞬間に発動する仕組みなので、その時点で
+               既に人間がレビュー・承認済みであり問題ない):
                `https://github.com/dOtOb9/qwen-local/compare/master...<ブランチ名>?quick_pull=1&title=<タイトル>&body=<本文>`
             10. `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-ready-for-pr`
             11. `gh issue comment <番号> --body "実装が完了しました。以下のリンクからPRを作成してください: <compare URL>"`

@@ -150,6 +150,18 @@ blocked. Creates branches and provides pre-filled PR links instead.")。
 `claude_args`には`DEBUG: true`の`settings`も追加し、次回実行時に
 何が拒否されているかをより詳しく追えるようにした。
 
+## 訂正(2026-09-12): `Refs`ではなく`Closes`を使うべきだった
+
+ユーザーから「PRがマージされてもIssueがCloseされない」と指摘を受け、
+上記の「`Fixes`/`Closes`を使わない理由」が誤りだったと判明。GitHubの
+キーワードによる自動クローズは**PRが実際にマージされた瞬間**に発動する
+仕組みで、その時点で人間は既にレビュー・承認済み。「レビュー前に
+片付いたように見えてしまう」という当初の懸念は的外れだった。
+
+対応: `agent-dev-loop.yml`のcompare URL組み立て部分を`Refs #<番号>`から
+`Closes #<番号>`に変更。既存の[PR #13](https://github.com/dOtOb9/qwen-local/pull/13)
+と、Issue #3のcompare URLコメントも修正済み。
+
 ## 初のエンドツーエンド成功(2026-09-12)
 
 3回目の手動実行(run 34676484244)は、Issue #1(ストリーミング表示)の実装・
