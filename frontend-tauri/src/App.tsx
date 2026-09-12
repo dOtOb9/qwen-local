@@ -38,19 +38,9 @@ import {
 } from "@/lib/pdf";
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
 import { getSetting, setSetting } from "@/lib/db";
-import { watchEarthquakes, fetchRecentEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
-import { EarthquakeView } from "@/components/EarthquakeView";
-import { Dock } from "@/components/Dock";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
-// 表示(地図・履歴)は震度1から、実際のデスクトップ通知はうるさくなりすぎないよう震度3から。
-const NOTIFY_MIN_SCALE = 30;
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -72,42 +62,8 @@ function App() {
   const [streamingContent, setStreamingContent] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
-  const [earthquakeAlert, setEarthquakeAlert] = useState<EarthquakeInfo | null>(null);
-  const [earthquakeHistory, setEarthquakeHistory] = useState<EarthquakeInfo[]>([]);
-  const [activeTab, setActiveTab] = useState<"chat" | "earthquake">("chat");
   const [selectedModel, setSelectedModel] = useState(MODEL);
   const [availableModels, setAvailableModels] = useState<string[]>([MODEL]);
-
-  useEffect(() => {
-    fetchRecentEarthquakes().then((history) => {
-      if (history.length > 0) setEarthquakeHistory(history);
-    });
-
-    (async () => {
-      let granted = await isPermissionGranted();
-      if (!granted) {
-        granted = (await requestPermission()) === "granted";
-      }
-    })();
-
-    const stopWatching = watchEarthquakes((quake) => {
-      setEarthquakeAlert(quake);
-      setEarthquakeHistory((prev) => [...prev, quake].slice(-30));
-
-      if (quake.maxScale >= NOTIFY_MIN_SCALE) {
-        isPermissionGranted().then((granted) => {
-          if (!granted) return;
-          sendNotification({
-            title: `地震情報: ${quake.maxScaleLabel}`,
-            body: `${quake.time} ${quake.hypocenterName} M${quake.magnitude || "不明"}${
-              quake.tsunami ? "・津波の可能性あり" : ""
-            }`,
-          });
-        });
-      }
-    });
-    return stopWatching;
-  }, []);
 
   useEffect(() => {
     const unlistenPromise = getCurrentWebview().onDragDropEvent((event) => {
@@ -381,19 +337,7 @@ function App() {
     }
   }
 
-  if (activeTab === "earthquake") {
-    return (
-      <>
-        <div className="h-screen pb-20">
-          <EarthquakeView history={earthquakeHistory} />
-        </div>
-        <Dock active={activeTab} onSelect={setActiveTab} />
-      </>
-    );
-  }
-
   return (
-    <>
     <div className="flex h-screen">
       <Sidebar
         sessions={sessions}
@@ -406,7 +350,7 @@ function App() {
         onDeleteMemory={handleDeleteMemory}
       />
 
-      <main className="flex h-screen flex-1 flex-col gap-4 p-4 pb-20">
+      <main className="flex h-screen flex-1 flex-col gap-4 p-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
           {appVersion && (
@@ -436,23 +380,6 @@ function App() {
             {issueStatus}
           </p>
         )}
-        {earthquakeAlert && (
-          <div className="flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <span>
-              🌐 地震情報: {earthquakeAlert.hypocenterName} M{earthquakeAlert.magnitude || "不明"}{" "}
-              最大{earthquakeAlert.maxScaleLabel}
-              {earthquakeAlert.tsunami ? "・津波の可能性あり" : ""}
-            </span>
-            <button
-              type="button"
-              onClick={() => setEarthquakeAlert(null)}
-              className="shrink-0 text-destructive hover:opacity-70"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
         <Card
           className={
             "flex-1 overflow-hidden p-0 transition-colors " +
@@ -574,8 +501,6 @@ function App() {
         </form>
       </main>
     </div>
-    <Dock active={activeTab} onSelect={setActiveTab} />
-    </>
   );
 }
 

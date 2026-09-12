@@ -37,7 +37,6 @@ open = "5.4.4"
 sha2 = "0.11.0"
 rand = "0.10.2"
 base64 = "0.23.1"
-tauri-plugin-notification = "2.4.0"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

@@ -69,6 +69,12 @@ jobs:
             4. `git checkout -b agent/issue-<番号>-<短い英語slug>` でブランチを作成する。
             5. Issue本文の要求を実装する。対象は主に `frontend-tauri/src/`
                (TypeScript/React) と `frontend-tauri/src-tauri/src/` (Rust)。
+               **このIssueの実装に直接必要なファイルだけを変更すること。**
+               このリポジトリは他のセッションも並行して開発しているため、
+               作業中に見かけた無関係な既存コード(他機能のコンポーネントや
+               TaskSheetsの他ファイルなど)が気になっても、リファクタ・
+               削除・簡略化をしない。参考のために読むのは問題ないが、
+               編集はIssueのスコープ内のファイルに限定する。
             6. `frontend-tauri/` で `npm run build`、`frontend-tauri/src-tauri/` で
                `cargo build` を実行し、両方成功することを確認する
                (これはLinuxランナー上での簡易コンパイル確認であり、実際にWindows
@@ -79,8 +85,11 @@ jobs:
                  `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-blocked`
                  とし、詰まった理由を `gh issue comment <番号>` で説明して終了する
                  (中途半端な実装をpushしない)。
-            7. 成功したら、変更したファイルだけを明示的に `git add` してコミットする
-               (`git add -A` は使わない。無関係な変更を巻き込まないため)。
+            7. 成功したら、commitする前に必ず `git diff --stat` で変更ファイル
+               一覧を確認し、このIssueと無関係なファイルが含まれていないか
+               チェックする。含まれていたら`git checkout -- <該当ファイル>`
+               で元に戻してから、変更したファイルだけを明示的に`git add`
+               してコミットする(`git add -A`は使わない)。
             8. `git push -u origin <ブランチ名>` でpushする。
             9. 以下の形式で「compare URL」を組み立てる(タイトル・本文はURLエンコードする。
                本文には `Refs #<番号>` を含める。`Fixes`/`Closes` は使わない。
