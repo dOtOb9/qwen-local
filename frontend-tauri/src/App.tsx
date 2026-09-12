@@ -320,7 +320,7 @@ function App() {
         onDeleteMemory={handleDeleteMemory}
       />
 
-      <main className="flex h-screen flex-1 flex-col gap-4 p-4 pb-20">
+      <main className="flex h-screen flex-1 flex-col gap-4 p-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
           {appVersion && (
