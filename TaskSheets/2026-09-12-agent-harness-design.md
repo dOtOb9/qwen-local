@@ -125,6 +125,31 @@ Issueを拾って実装・PR作成まで自律的に進め、人間は空いた�
    マージした上で、Actionsタブから`Agent Dev Loop`を手動実行(Run workflow)
    して1サイクル試す)
 
+## 制約の発覚(2026-09-12): claude-code-actionはPRを自分で作成できない
+
+1回目の手動実行(run 34675980971)は「成功」扱いだったが、実際には
+Issueに`agent-in-progress`ラベルを付けただけでブランチ・PRとも作られず、
+`permission_denials_count: 1`のまま終了していた。`claude-code-guide`
+エージェントで調査した結果、`claude-code-action`は**仕様として`gh pr create`
+(PR作成)をブロックしている**ことが判明(公式FAQより: "PR creation is
+blocked. Creates branches and provides pre-filled PR links instead.")。
+また `--allowedTools "Bash"` のような素の許可では不十分で、
+`Bash(git:*)`, `Bash(gh:*)` のようにサブコマンド単位のパターンで
+許可する必要があった。
+
+これを受けてハーネスのステップ9〜11を変更:
+- (旧)`gh pr create`でPRを直接作成 → (新)ブランチをpushした後、
+  `https://github.com/dOtOb9/qwen-local/compare/master...<ブランチ>?quick_pull=1&title=...&body=...`
+  形式の「compare URL」を組み立て、Issueコメントに貼るだけに留める
+- ラベルも`agent-authored`から`agent-ready-for-pr`に変更
+  (「PRを作った」ではなく「PRを作る準備ができた」という意味に合わせる)
+- 人間の役割は「compare URLをクリックしてPRを作成する」1ステップが
+  追加されたが、これは元々の設計意図(Human on the Loop、PRのマージは
+  人間が行う)とむしろ整合的。マージ前のもう1つの確認ポイントが増えた形
+
+`claude_args`には`DEBUG: true`の`settings`も追加し、次回実行時に
+何が拒否されているかをより詳しく追えるようにした。
+
 ## 実行場所についての結論
 
 このハーネスを駆動するのはOllamaではなくClaude Code自身（コーディング

@@ -40,13 +40,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: '--allowedTools "Bash,Edit,Write,Read,Glob,Grep" --max-turns 30'
+          settings: |
+            {
+              "env": { "DEBUG": "true" }
+            }
+          claude_args: >-
+            --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(cargo:*),Edit,Write,Read,Glob,Grep"
+            --max-turns 30
           prompt: |
             あなたは qwen-local リポジトリ(Tauriデスクトップアプリ、本体は
             frontend-tauri/)の自律開発エージェントです。以下の手順で、
-            Issueを1件だけ選んで実装からPR作成までを行ってください。
+            Issueを1件だけ選んで実装からブランチpushまでを行ってください。
             詳細な設計は TaskSheets/2026-09-12-agent-harness-design.md
             にあります。
+
+            注意: このアクションの仕様上、PRを自分で作成することはできません
+            (`gh pr create`はブロックされます)。ブランチをpushした後は、
+            人間がワンクリックでPRを作成できる「compare URL」をIssueコメントに
+            貼るところまでを行ってください。
 
             ## 手順
             1. `gh issue list --repo dOtOb9/qwen-local --label agent-ready --state open`
@@ -67,22 +78,24 @@ jobs:
                - それでも解決しない場合は、
                  `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-blocked`
                  とし、詰まった理由を `gh issue comment <番号>` で説明して終了する
-                 (中途半端な実装をPRにしない)。
+                 (中途半端な実装をpushしない)。
             7. 成功したら、変更したファイルだけを明示的に `git add` してコミットする
                (`git add -A` は使わない。無関係な変更を巻き込まないため)。
             8. `git push -u origin <ブランチ名>` でpushする。
-            9. `gh pr create --base master --title "..." --body "..."` でPRを作成する。
-               本文には `Refs #<番号>` と記載する(`Fixes`/`Closes` は使わない。
-               マージ前にIssueが自動クローズされ、レビューが漏れるのを防ぐため)。
-            10. `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-authored`
-            11. `gh issue comment <番号> --body "PRを作成しました: <PR URL>"`
+            9. 以下の形式で「compare URL」を組み立てる(タイトル・本文はURLエンコードする。
+               本文には `Refs #<番号>` を含める。`Fixes`/`Closes` は使わない。
+               マージ前にIssueが自動クローズされ、レビューが漏れるのを防ぐため):
+               `https://github.com/dOtOb9/qwen-local/compare/master...<ブランチ名>?quick_pull=1&title=<タイトル>&body=<本文>`
+            10. `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-ready-for-pr`
+            11. `gh issue comment <番号> --body "実装が完了しました。以下のリンクからPRを作成してください: <compare URL>"`
             12. `TaskSheets/YYYY-MM-DD-issue-<番号>.md` を規定のテンプレート
                 (タイトル/日付/ステータス/目的/やったこと/次にやること)で作成し、
                 同じブランチ・同じコミットに含める。
 
             ## 厳守事項(ガードレール)
             - `master` への直接push・force pushは絶対に行わない。
-            - 作成したPRを自分でマージしない(マージは人間が行う)。
+            - PRの作成・マージは行わない(できない仕様でもあるが、意図的にも行わない。
+              人間がcompare URLからPRを作成し、レビュー後にマージする)。
             - `.github/workflows/` 配下のファイルは変更しない。
             - 依存関係の破壊的アップグレード、バージョン/リリースタグの操作はしない。
             - シークレットやトークンの扱いを変更する変更はしない。
