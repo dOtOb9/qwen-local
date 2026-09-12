@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -30,7 +31,7 @@ import {
   parseAttachedFileMessage,
 } from "@/lib/pdf";
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
-import { getSetting } from "@/lib/db";
+import { getSetting, upsertEbooks } from "@/lib/db";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -88,6 +89,25 @@ function App() {
       setMemories(existingMemories);
       if (existingSessions.length > 0) {
         setActiveSessionId(existingSessions[0].id);
+      }
+    })();
+
+    // Sync local ebook libraries (Kindle/Kinoppy) in the background; both
+    // read local files only, no network/login involved, so failures (e.g.
+    // the app isn't installed) are silently ignored.
+    (async () => {
+      try {
+        const [kindle, kinoppy] = await Promise.all([
+          invoke<
+            { source: string; external_id: string; title: string; authors: string; purchase_date: number }[]
+          >("sync_kindle_library"),
+          invoke<
+            { source: string; external_id: string; title: string; authors: string; purchase_date: number }[]
+          >("sync_kinoppy_library"),
+        ]);
+        await upsertEbooks([...kindle, ...kinoppy]);
+      } catch (e) {
+        console.error("Ebook library sync failed:", e);
       }
     })();
 

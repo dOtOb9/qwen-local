@@ -388,6 +388,11 @@ GitHub Actionsの定期実行でクラウドのClaude Codeが実装してPRを�
 ## 次にやること
 
 - Rakuten Application IDを発行してもらい、実際に商品検索が動くか確認する
+- Google Calendar連携: 「秘書作業」をしてほしいという要望あり(2026-09-12)。
+  Gmailと同様、Google Cloud ConsoleでのOAuthクライアント作成(ユーザー側の
+  一手間)が前提。スコープはCalendar API(`calendar.events`等)。
+  着手前に「秘書作業」の具体的な範囲(予定の読み上げ/要約、リマインド、
+  チャットからの予定作成、のどこまでか)をユーザーに確認する必要あり。未着手。
 - Gmail連携の調査(OAuthクライアント作成手順の整理)
 - Vivaldi.netがIMAP等でアクセス可能か調査
 - 銀行口座連携: Money Forward ME等の公式連携APIの調査(直接スクレイピングはしない)

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { searchEbooks } from "@/lib/db";
 
 export type ChatMessage = {
   role: string;
@@ -47,6 +48,23 @@ const RAKUTEN_TOOL = {
   },
 };
 
+const EBOOK_TOOL = {
+  type: "function",
+  function: {
+    name: "check_owned_ebooks",
+    description:
+      "ユーザーがKindle/Kinoppyで既に持っている電子書籍を検索する。" +
+      "「持っている本」「買った本」に関する質問や、本を勧める前の重複確認に使う。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "タイトルや著者名の一部" },
+      },
+      required: ["query"],
+    },
+  },
+};
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
@@ -67,6 +85,12 @@ async function callTool(
     });
     return JSON.stringify(results);
   }
+  if (name === "check_owned_ebooks") {
+    const query = String(args.query ?? "");
+    ctx.onStatus?.(`蔵書を確認中: ${query}`);
+    const results = await searchEbooks(query);
+    return JSON.stringify(results.map((r) => ({ title: r.title, authors: r.authors, source: r.source })));
+  }
   return JSON.stringify({ error: `unknown tool: ${name}` });
 }
 
@@ -79,7 +103,9 @@ export async function chatWithTools(
   ctx: ToolContext = {},
 ): Promise<string> {
   const messages = [...initialMessages];
-  const tools = ctx.rakutenAppId ? [SEARCH_TOOL, RAKUTEN_TOOL] : [SEARCH_TOOL];
+  const tools = ctx.rakutenAppId
+    ? [SEARCH_TOOL, RAKUTEN_TOOL, EBOOK_TOOL]
+    : [SEARCH_TOOL, EBOOK_TOOL];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await fetch(`${ollamaUrl}/api/chat`, {

@@ -1,3 +1,4 @@
+mod ebooks;
 mod github;
 mod rakuten;
 mod search;
@@ -39,6 +40,21 @@ pub fn run() {
             );
         ",
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 3,
+        description: "create_ebooks",
+        sql: "
+            CREATE TABLE ebooks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                authors TEXT NOT NULL,
+                purchase_date INTEGER NOT NULL,
+                UNIQUE(source, external_id)
+            );
+        ",
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -55,7 +71,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             search::search_web,
             github::create_github_issue,
-            rakuten::search_rakuten
+            rakuten::search_rakuten,
+            ebooks::sync_kindle_library,
+            ebooks::sync_kinoppy_library
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
