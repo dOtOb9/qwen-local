@@ -15,19 +15,26 @@ export function SettingsDialog() {
   const [token, setToken] = useState("");
   const [repo, setRepo] = useState("dOtOb9/qwen-local");
   const [rakutenAppId, setRakutenAppId] = useState("");
+  const [vivaldiEmail, setVivaldiEmail] = useState("");
+  const [vivaldiPassword, setVivaldiPassword] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [savedToken, savedRepo, savedRakutenAppId] = await Promise.all([
-        getSetting("github_token"),
-        getSetting("github_repo"),
-        getSetting("rakuten_app_id"),
-      ]);
+      const [savedToken, savedRepo, savedRakutenAppId, savedVivaldiEmail, savedVivaldiPassword] =
+        await Promise.all([
+          getSetting("github_token"),
+          getSetting("github_repo"),
+          getSetting("rakuten_app_id"),
+          getSetting("vivaldi_email"),
+          getSetting("vivaldi_password"),
+        ]);
       setToken(savedToken ?? "");
       setRepo(savedRepo ?? "dOtOb9/qwen-local");
       setRakutenAppId(savedRakutenAppId ?? "");
+      setVivaldiEmail(savedVivaldiEmail ?? "");
+      setVivaldiPassword(savedVivaldiPassword ?? "");
     })();
   }, [open]);
 
@@ -36,6 +43,8 @@ export function SettingsDialog() {
       setSetting("github_token", token.trim()),
       setSetting("github_repo", repo.trim()),
       setSetting("rakuten_app_id", rakutenAppId.trim()),
+      setSetting("vivaldi_email", vivaldiEmail.trim()),
+      setSetting("vivaldi_password", vivaldiPassword.trim()),
     ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -80,6 +89,26 @@ export function SettingsDialog() {
               value={rakutenAppId}
               onChange={(e) => setRakutenAppId(e.currentTarget.value)}
               placeholder="1234567890123456789"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">
+              Vivaldi.net メールアドレス
+            </label>
+            <Input
+              value={vivaldiEmail}
+              onChange={(e) => setVivaldiEmail(e.currentTarget.value)}
+              placeholder="you@vivaldi.net"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">
+              Vivaldi.net パスワード(2段階認証ONならアプリ用パスワード)
+            </label>
+            <Input
+              type="password"
+              value={vivaldiPassword}
+              onChange={(e) => setVivaldiPassword(e.currentTarget.value)}
             />
           </div>
           <Button onClick={save}>{saved ? "保存しました" : "保存"}</Button>

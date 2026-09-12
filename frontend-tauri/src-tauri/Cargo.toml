@@ -32,6 +32,9 @@ tauri-plugin-dialog = "2.7.3"
 tauri-plugin-fs = "2.5.2"
 roxmltree = "0.21.1"
 rusqlite = "0.31"
+imap = "2.4.1"
+rfc2047-decoder = "1.1.2"
+native-tls = "0.2.18"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

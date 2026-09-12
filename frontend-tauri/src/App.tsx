@@ -271,9 +271,15 @@ function App() {
       }
       chatMessages.push(...nextMessages.map((m) => ({ role: m.role, content: m.content })));
 
-      const rakutenAppId = (await getSetting("rakuten_app_id")) ?? undefined;
+      const [rakutenAppId, vivaldiEmail, vivaldiPassword] = await Promise.all([
+        getSetting("rakuten_app_id"),
+        getSetting("vivaldi_email"),
+        getSetting("vivaldi_password"),
+      ]);
       const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages, {
-        rakutenAppId,
+        rakutenAppId: rakutenAppId ?? undefined,
+        vivaldiEmail: vivaldiEmail ?? undefined,
+        vivaldiPassword: vivaldiPassword ?? undefined,
         onStatus: setToolStatus,
       });
       setToolStatus(null);

@@ -9,13 +9,29 @@ export type ChatMessage = {
 
 export type ToolContext = {
   rakutenAppId?: string;
+  vivaldiEmail?: string;
+  vivaldiPassword?: string;
   onStatus?: (status: string) => void;
 };
 
 type SearchResult = { title: string; url: string; snippet: string };
 type RakutenItem = { name: string; price: number; url: string; shop: string };
+type EmailSummary = { from: string; subject: string; date: string; unread: boolean };
 
-const SEARCH_TOOL = {
+type ToolDef = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description: string }>;
+      required: string[];
+    };
+  };
+};
+
+const SEARCH_TOOL: ToolDef = {
   type: "function",
   function: {
     name: "search_web",
@@ -31,7 +47,7 @@ const SEARCH_TOOL = {
   },
 };
 
-const RAKUTEN_TOOL = {
+const RAKUTEN_TOOL: ToolDef = {
   type: "function",
   function: {
     name: "search_rakuten",
@@ -48,7 +64,7 @@ const RAKUTEN_TOOL = {
   },
 };
 
-const EBOOK_TOOL = {
+const EBOOK_TOOL: ToolDef = {
   type: "function",
   function: {
     name: "check_owned_ebooks",
@@ -61,6 +77,21 @@ const EBOOK_TOOL = {
         query: { type: "string", description: "タイトルや著者名の一部" },
       },
       required: ["query"],
+    },
+  },
+};
+
+const EMAIL_TOOL: ToolDef = {
+  type: "function",
+  function: {
+    name: "check_email",
+    description:
+      "Vivaldi.netの受信メール(直近10件)を確認する。未読メール・最近届いた" +
+      "メールについて聞かれた時に使う。",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
     },
   },
 };
@@ -85,6 +116,15 @@ async function callTool(
     });
     return JSON.stringify(results);
   }
+  if (name === "check_email" && ctx.vivaldiEmail && ctx.vivaldiPassword) {
+    ctx.onStatus?.("メールを確認中...");
+    const results = await invoke<EmailSummary[]>("fetch_recent_emails", {
+      username: ctx.vivaldiEmail,
+      password: ctx.vivaldiPassword,
+      limit: 10,
+    });
+    return JSON.stringify(results);
+  }
   if (name === "check_owned_ebooks") {
     const query = String(args.query ?? "");
     ctx.onStatus?.(`蔵書を確認中: ${query}`);
@@ -103,9 +143,9 @@ export async function chatWithTools(
   ctx: ToolContext = {},
 ): Promise<string> {
   const messages = [...initialMessages];
-  const tools = ctx.rakutenAppId
-    ? [SEARCH_TOOL, RAKUTEN_TOOL, EBOOK_TOOL]
-    : [SEARCH_TOOL, EBOOK_TOOL];
+  const tools: ToolDef[] = [SEARCH_TOOL, EBOOK_TOOL];
+  if (ctx.rakutenAppId) tools.push(RAKUTEN_TOOL);
+  if (ctx.vivaldiEmail && ctx.vivaldiPassword) tools.push(EMAIL_TOOL);
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await fetch(`${ollamaUrl}/api/chat`, {

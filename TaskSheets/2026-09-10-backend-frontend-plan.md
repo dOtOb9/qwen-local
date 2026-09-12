@@ -385,16 +385,55 @@ GitHub Actionsの定期実行でクラウドのClaude Codeが実装してPRを�
 - ついでにツール実行中のステータス表示(「Web検索中: …」)を`chatWithTools`に
   `onStatus`コールバックとして追加(ユーザー要望)。
 
+## 蔵書連携(Kindle/Kinoppy)とVivaldi.netメール連携を実装
+
+「秘書化」構想の続き。Kobo以外の電子書籍サービスと、Vivaldi.netメールに対応。
+
+- **Kindle/Kinoppyとも公式の個人蔵書APIは存在しない**と判明(Amazonは商品カタログ
+  検索用のProduct Advertising APIのみ)。代わりにどちらもログイン不要の
+  ローカルキャッシュファイルを直接読む方式を採用:
+  - Kindle for PC: `%LOCALAPPDATA%\Amazon\Kindle\Cache\KindleSyncMetadataCache.xml`
+    (公式アプリが書き出す平文XML。ASIN/タイトル/著者/購入日を含む)
+  - Kinoppy: `%APPDATA%\Kinokuniya\Kinoppy3\*.dat`
+    (拡張子は.datだが中身は暗号化されていないSQLite。`Book`/`Author`テーブル)
+  - `src-tauri/src/ebooks.rs`に`sync_kindle_library`/`sync_kinoppy_library`
+    コマンドを実装(roxmltree, rusqlite使用)。起動時に自動同期し、`ebooks`
+    テーブルに保存。`check_owned_ebooks`ツールでモデルが必要な時だけ検索する
+    (全件を毎回プロンプトに詰めない設計、楽天/Web検索と同じ思想)。
+  - Kobo: このPCに未インストールのため保留。実機Kobo端末をUSB接続すれば
+    同様に`KoboReader.sqlite`を読める見込み(未検証)。
+  - 依存解決の詰まりどころ: `rusqlite`の`bundled`機能が、既に`tauri-plugin-sql`
+    経由で入っている`libsqlite3-sys`と「同じネイティブライブラリを二重にリンク
+    しようとする」形で衝突した。`rusqlite`のバージョンを、既存の
+    `libsqlite3-sys`バージョンと一致するものに固定することで解決
+    (結果的に`sqlx`が0.8.6→0.8.0にダウングレードされたが、動作に支障なし)。
+- **Vivaldi.netメール**: 公式APIはないが、標準IMAP(`imap.vivaldi.net:993`,
+  TLS)でアクセス可能と判明(2段階認証ONならアプリ用パスワードが必要)。
+  Gmail(OAuth必須)より簡単なため先行実装。`src-tauri/src/mail.rs`に
+  `fetch_recent_emails`コマンドを追加(`imap`クレート、件名などのMIME
+  エンコード(`=?UTF-8?B?...?=`等)は`rfc2047-decoder`でデコード)。
+  `check_email`ツールとして直近10件の未読/件名/差出人を確認できる。
+- どちらの新機能も`SettingsDialog.tsx`に入力欄を追加(GitHub Token等と同じ
+  パターン: 未設定なら該当ツールをOllamaに提示しないので混乱しない)。
+
+## 並行セッションについて
+
+このリポジトリでロボット関連(ESP32-CAM等)の別プロジェクトを扱う
+別のClaude Codeセッションが並行稼働していることが判明(git logに無関係な
+コミットが混在)。ユーザーに確認したところ意図的とのこと。今後
+`git add -A`は避け、自分が触ったファイルだけを明示的にstageすること。
+`agent-harness-design.md`(Issue→PR自律化の設計)は別セッションが対応中のため触らない。
+
 ## 次にやること
 
 - Rakuten Application IDを発行してもらい、実際に商品検索が動くか確認する
+- Vivaldi.netのメールアドレス/パスワードを設定して、実際にメール確認が動くか確認する
 - Google Calendar連携: 「秘書作業」をしてほしいという要望あり(2026-09-12)。
   Gmailと同様、Google Cloud ConsoleでのOAuthクライアント作成(ユーザー側の
   一手間)が前提。スコープはCalendar API(`calendar.events`等)。
   着手前に「秘書作業」の具体的な範囲(予定の読み上げ/要約、リマインド、
   チャットからの予定作成、のどこまでか)をユーザーに確認する必要あり。未着手。
 - Gmail連携の調査(OAuthクライアント作成手順の整理)
-- Vivaldi.netがIMAP等でアクセス可能か調査
 - 銀行口座連携: Money Forward ME等の公式連携APIの調査(直接スクレイピングはしない)
 - (ユーザー対応待ち) `/install-github-app`の実行、およびcronワークフローの内容確定
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)
