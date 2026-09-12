@@ -32,6 +32,7 @@ import {
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
 import { getSetting } from "@/lib/db";
 import { watchEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
+import { EarthquakeView } from "@/components/EarthquakeView";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -57,10 +58,13 @@ function App() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
   const [earthquakeAlert, setEarthquakeAlert] = useState<EarthquakeInfo | null>(null);
+  const [earthquakeHistory, setEarthquakeHistory] = useState<EarthquakeInfo[]>([]);
+  const [activeTab, setActiveTab] = useState<"chat" | "earthquake">("chat");
 
   useEffect(() => {
     const stopWatching = watchEarthquakes((quake) => {
       setEarthquakeAlert(quake);
+      setEarthquakeHistory((prev) => [...prev, quake].slice(-30));
     });
     return stopWatching;
   }, []);
@@ -330,12 +334,39 @@ function App() {
       />
 
       <main className="flex h-screen flex-1 flex-col gap-4 p-4">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold">Qwen Local Chat</h1>
           {appVersion && (
             <span className="text-xs text-muted-foreground">v{appVersion}</span>
           )}
+          <div className="ml-auto flex gap-1 rounded-md bg-muted p-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("chat")}
+              className={
+                "rounded px-3 py-1 text-sm " +
+                (activeTab === "chat" ? "bg-background shadow-sm" : "text-muted-foreground")
+              }
+            >
+              チャット
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("earthquake")}
+              className={
+                "rounded px-3 py-1 text-sm " +
+                (activeTab === "earthquake" ? "bg-background shadow-sm" : "text-muted-foreground")
+              }
+            >
+              地震情報
+            </button>
+          </div>
         </div>
+
+        {activeTab === "earthquake" ? (
+          <EarthquakeView history={earthquakeHistory} />
+        ) : (
+          <>
         {updateStatus && (
           <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             {updateStatus}
@@ -482,6 +513,8 @@ function App() {
             送信
           </Button>
         </form>
+          </>
+        )}
       </main>
     </div>
   );

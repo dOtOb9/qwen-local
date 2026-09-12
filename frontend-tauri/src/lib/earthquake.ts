@@ -1,6 +1,9 @@
 export type EarthquakeInfo = {
+  id: string;
   time: string;
   hypocenterName: string;
+  latitude: number | null;
+  longitude: number | null;
   magnitude: number;
   maxScale: number;
   maxScaleLabel: string;
@@ -26,9 +29,10 @@ function scaleLabel(scale: number): string {
 
 type RawQuakeMessage = {
   code: number;
+  id?: string;
   earthquake?: {
     time: string;
-    hypocenter?: { name?: string; magnitude?: number };
+    hypocenter?: { name?: string; magnitude?: number; latitude?: number; longitude?: number };
     maxScale?: number;
     domesticTsunami?: string;
   };
@@ -57,9 +61,15 @@ export function watchEarthquakes(
         const maxScale = data.earthquake.maxScale ?? 0;
         if (maxScale < minScale) return;
 
+        const lat = data.earthquake.hypocenter?.latitude;
+        const lon = data.earthquake.hypocenter?.longitude;
+
         onQuake({
+          id: data.id ?? `${data.earthquake.time}-${Math.random()}`,
           time: data.earthquake.time,
           hypocenterName: data.earthquake.hypocenter?.name ?? "不明",
+          latitude: typeof lat === "number" && lat !== -200 ? lat : null,
+          longitude: typeof lon === "number" && lon !== -200 ? lon : null,
           magnitude: data.earthquake.hypocenter?.magnitude ?? 0,
           maxScale,
           maxScaleLabel: scaleLabel(maxScale),
