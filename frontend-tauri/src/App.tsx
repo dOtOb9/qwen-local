@@ -31,6 +31,7 @@ import {
 } from "@/lib/pdf";
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
 import { getSetting } from "@/lib/db";
+import { watchEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
 
 const OLLAMA_URL = "http://localhost:11434";
 const MODEL = "qwen2.5:7b-instruct";
@@ -55,6 +56,14 @@ function App() {
   const [streamingContent, setStreamingContent] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
+  const [earthquakeAlert, setEarthquakeAlert] = useState<EarthquakeInfo | null>(null);
+
+  useEffect(() => {
+    const stopWatching = watchEarthquakes((quake) => {
+      setEarthquakeAlert(quake);
+    });
+    return stopWatching;
+  }, []);
 
   useEffect(() => {
     const unlistenPromise = getCurrentWebview().onDragDropEvent((event) => {
@@ -336,6 +345,22 @@ function App() {
           <p className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             {issueStatus}
           </p>
+        )}
+        {earthquakeAlert && (
+          <div className="flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <span>
+              🌐 地震情報: {earthquakeAlert.hypocenterName} M{earthquakeAlert.magnitude || "不明"}{" "}
+              最大{earthquakeAlert.maxScaleLabel}
+              {earthquakeAlert.tsunami ? "・津波の可能性あり" : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setEarthquakeAlert(null)}
+              className="shrink-0 text-destructive hover:opacity-70"
+            >
+              ×
+            </button>
+          </div>
         )}
 
         <Card
