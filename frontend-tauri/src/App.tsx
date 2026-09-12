@@ -242,6 +242,10 @@ function App() {
       await addMessage(sessionId, "user", content);
 
       const chatMessages: { role: string; content: string }[] = [];
+      const systemPrompt = await getSetting("system_prompt");
+      if (systemPrompt) {
+        chatMessages.push({ role: "system", content: systemPrompt });
+      }
       if (memories.length > 0) {
         chatMessages.push({
           role: "system",

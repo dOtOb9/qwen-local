@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { getSetting, setSetting } from "@/lib/db";
 
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
@@ -24,6 +25,7 @@ export function SettingsDialog() {
   const [googleClientSecret, setGoogleClientSecret] = useState("");
   const [googleRefreshToken, setGoogleRefreshToken] = useState("");
   const [googleLoginStatus, setGoogleLoginStatus] = useState<string | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function SettingsDialog() {
         savedGoogleClientId,
         savedGoogleClientSecret,
         savedGoogleRefreshToken,
+        savedSystemPrompt,
       ] = await Promise.all([
         getSetting("github_token"),
         getSetting("github_repo"),
@@ -47,6 +50,7 @@ export function SettingsDialog() {
         getSetting("google_client_id"),
         getSetting("google_client_secret"),
         getSetting("google_refresh_token"),
+        getSetting("system_prompt"),
       ]);
       setToken(savedToken ?? "");
       setRepo(savedRepo ?? "dOtOb9/qwen-local");
@@ -56,6 +60,7 @@ export function SettingsDialog() {
       setGoogleClientId(savedGoogleClientId ?? "");
       setGoogleClientSecret(savedGoogleClientSecret ?? "");
       setGoogleRefreshToken(savedGoogleRefreshToken ?? "");
+      setSystemPrompt(savedSystemPrompt ?? "");
       setGoogleLoginStatus(null);
     })();
   }, [open]);
@@ -69,6 +74,7 @@ export function SettingsDialog() {
       setSetting("vivaldi_password", vivaldiPassword.trim()),
       setSetting("google_client_id", googleClientId.trim()),
       setSetting("google_client_secret", googleClientSecret.trim()),
+      setSetting("system_prompt", systemPrompt.trim()),
     ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -192,6 +198,18 @@ export function SettingsDialog() {
             {googleLoginStatus && (
               <p className="text-xs text-muted-foreground">{googleLoginStatus}</p>
             )}
+          </div>
+
+          <div className="flex flex-col gap-1 border-t border-border pt-3">
+            <label className="text-xs text-muted-foreground">
+              System Prompt(チャット全体に適用する指示。任意)
+            </label>
+            <Textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.currentTarget.value)}
+              placeholder="例: 常に関西弁で答えて"
+              rows={4}
+            />
           </div>
 
           <Button onClick={save}>{saved ? "保存しました" : "保存"}</Button>
