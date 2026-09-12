@@ -14,6 +14,8 @@ export type ToolContext = {
   googleClientSecret?: string;
   googleRefreshToken?: string;
   onStatus?: (status: string) => void;
+  /** ストリーミングでアシスタントのテキストが増えるたびに呼ばれる(蓄積済み全文を渡す) */
+  onToken?: (content: string) => void;
 };
 
 type SearchResult = { title: string; url: string; snippet: string };
@@ -146,6 +148,82 @@ async function callTool(
 
 const MAX_TOOL_ROUNDS = 3;
 
+/**
+ * `/api/chat` を `stream: true` で叩き、NDJSON(1行1JSON)のレスポンスを読みながら
+ * `role`/蓄積済み`content`/`tool_calls`(来ていれば)を返す。tool_callsが確認できた
+ * 時点でストリームを打ち切る(以降のトークンを待たずに次のツール実行に進むため)。
+ */
+async function streamChat(
+  ollamaUrl: string,
+  model: string,
+  messages: ChatMessage[],
+  tools: ToolDef[],
+  onToken?: (content: string) => void,
+): Promise<{ role: string; content: string; tool_calls?: ChatMessage["tool_calls"] }> {
+  const res = await fetch(`${ollamaUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages,
+      tools,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let role = "assistant";
+  let content = "";
+  let toolCalls: ChatMessage["tool_calls"] | undefined;
+
+  const processLine = (line: string): boolean => {
+    if (!line.trim()) return false;
+    const chunk = JSON.parse(line);
+    const msg = chunk.message;
+    if (msg) {
+      role = msg.role ?? role;
+      if (msg.content) {
+        content += msg.content;
+        onToken?.(content);
+      }
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        toolCalls = msg.tool_calls;
+        return true;
+      }
+    }
+    return Boolean(chunk.done);
+  };
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex: number;
+      let stop = false;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+        if (processLine(line)) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) break;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+
+  return { role, content, tool_calls: toolCalls };
+}
+
 export async function chatWithTools(
   ollamaUrl: string,
   model: string,
@@ -161,30 +239,20 @@ export async function chatWithTools(
   }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await fetch(`${ollamaUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools,
-        stream: false,
-      }),
-    });
+    const { role, content, tool_calls } = await streamChat(
+      ollamaUrl,
+      model,
+      messages,
+      tools,
+      ctx.onToken,
+    );
 
-    if (!res.ok) {
-      throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
+    if (!tool_calls || tool_calls.length === 0) {
+      return content;
     }
 
-    const data = await res.json();
-    const message: ChatMessage = data.message;
-
-    if (!message.tool_calls || message.tool_calls.length === 0) {
-      return message.content;
-    }
-
-    messages.push(message);
-    for (const call of message.tool_calls) {
+    messages.push({ role, content, tool_calls });
+    for (const call of tool_calls) {
       const result = await callTool(call.function.name, call.function.arguments, ctx);
       messages.push({ role: "tool", content: result });
     }
