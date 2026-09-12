@@ -23,7 +23,7 @@ import {
   type StoredMessage,
 } from "@/lib/db";
 import { checkForUpdateAndInstall } from "@/lib/updater";
-import { chatWithTools, fetchAvailableModels } from "@/lib/ollama";
+import { chatWithTools, fetchAvailableModels, type OllamaModel } from "@/lib/ollama";
 import {
   Select,
   SelectContent,
@@ -63,7 +63,9 @@ function App() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [issueStatus, setIssueStatus] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState(MODEL);
-  const [availableModels, setAvailableModels] = useState<string[]>([MODEL]);
+  const [availableModels, setAvailableModels] = useState<OllamaModel[]>([
+    { name: MODEL, supportsTools: true },
+  ]);
 
   useEffect(() => {
     const unlistenPromise = getCurrentWebview().onDragDropEvent((event) => {
@@ -113,7 +115,8 @@ function App() {
         const models = await fetchAvailableModels(OLLAMA_URL);
         if (models.length > 0) {
           setAvailableModels(models);
-          setSelectedModel(savedModel && models.includes(savedModel) ? savedModel : models[0]);
+          const savedModelExists = savedModel && models.some((m) => m.name === savedModel);
+          setSelectedModel(savedModelExists ? savedModel : models[0].name);
           return;
         }
       } catch (e) {
@@ -302,7 +305,10 @@ function App() {
         getSetting("google_refresh_token"),
       ]);
       setStreamingContent("");
+      const supportsTools =
+        availableModels.find((m) => m.name === selectedModel)?.supportsTools ?? true;
       const assistantContent = await chatWithTools(OLLAMA_URL, selectedModel, chatMessages, {
+        supportsTools,
         rakutenAppId: rakutenAppId ?? undefined,
         vivaldiEmail: vivaldiEmail ?? undefined,
         vivaldiPassword: vivaldiPassword ?? undefined,
@@ -366,8 +372,8 @@ function App() {
             </SelectTrigger>
             <SelectContent>
               {availableModels.map((model) => (
-                <SelectItem key={model} value={model}>
-                  {model}
+                <SelectItem key={model.name} value={model.name}>
+                  {model.name}
                 </SelectItem>
               ))}
             </SelectContent>

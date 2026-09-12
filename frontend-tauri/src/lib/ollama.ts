@@ -13,6 +13,8 @@ export type ToolContext = {
   googleClientId?: string;
   googleClientSecret?: string;
   googleRefreshToken?: string;
+  /** falseなら(モデルがtool呼び出し非対応の場合)ツール定義を一切送らない */
+  supportsTools?: boolean;
   onStatus?: (status: string) => void;
   /** ストリーミングでアシスタントのテキストが増えるたびに呼ばれる(蓄積済み全文を渡す) */
   onToken?: (content: string) => void;
@@ -146,18 +148,24 @@ async function callTool(
   return JSON.stringify({ error: `unknown tool: ${name}` });
 }
 
+export type OllamaModel = { name: string; supportsTools: boolean };
+
 /**
- * Ollamaの `/api/tags` を叩き、ローカルにpull済みのモデル名一覧を返す。
+ * Ollamaの `/api/tags` を叩き、ローカルにpull済みのモデル一覧
+ * (名前とtool呼び出し対応の有無)を返す。
  * Ollama未起動時などは例外を投げるので、呼び出し側でフォールバックすること。
  */
-export async function fetchAvailableModels(ollamaUrl: string): Promise<string[]> {
+export async function fetchAvailableModels(ollamaUrl: string): Promise<OllamaModel[]> {
   const res = await fetch(`${ollamaUrl}/api/tags`);
   if (!res.ok) {
     throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
   }
   const data = await res.json();
-  const models = data.models as { name: string }[] | undefined;
-  return (models ?? []).map((m) => m.name);
+  const models = data.models as { name: string; capabilities?: string[] }[] | undefined;
+  return (models ?? []).map((m) => ({
+    name: m.name,
+    supportsTools: m.capabilities?.includes("tools") ?? false,
+  }));
 }
 
 const MAX_TOOL_ROUNDS = 3;
@@ -245,11 +253,14 @@ export async function chatWithTools(
   ctx: ToolContext = {},
 ): Promise<string> {
   const messages = [...initialMessages];
-  const tools: ToolDef[] = [SEARCH_TOOL];
-  if (ctx.rakutenAppId) tools.push(RAKUTEN_TOOL);
-  if (ctx.vivaldiEmail && ctx.vivaldiPassword) tools.push(EMAIL_TOOL);
-  if (ctx.googleClientId && ctx.googleClientSecret && ctx.googleRefreshToken) {
-    tools.push(GMAIL_TOOL);
+  const tools: ToolDef[] = [];
+  if (ctx.supportsTools !== false) {
+    tools.push(SEARCH_TOOL);
+    if (ctx.rakutenAppId) tools.push(RAKUTEN_TOOL);
+    if (ctx.vivaldiEmail && ctx.vivaldiPassword) tools.push(EMAIL_TOOL);
+    if (ctx.googleClientId && ctx.googleClientSecret && ctx.googleRefreshToken) {
+      tools.push(GMAIL_TOOL);
+    }
   }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
