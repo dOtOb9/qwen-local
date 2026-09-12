@@ -1,0 +1,82 @@
+name: Agent Dev Loop
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  dev-loop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: frontend-tauri
+        run: npm ci
+
+      - name: Run agent dev loop cycle
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash,Edit,Write,Read,Glob,Grep" --max-turns 30'
+          prompt: |
+            あなたは qwen-local リポジトリ(Tauriデスクトップアプリ、本体は
+            frontend-tauri/)の自律開発エージェントです。以下の手順で、
+            Issueを1件だけ選んで実装からPR作成までを行ってください。
+            詳細な設計は TaskSheets/2026-09-12-agent-harness-design.md
+            にあります。
+
+            ## 手順
+            1. `gh issue list --repo dOtOb9/qwen-local --label agent-ready --state open`
+               で候補を確認する。
+            2. `agent-in-progress` ラベルが付いていないものを1件選ぶ
+               (複数あれば番号が小さいものを優先)。該当が無ければ何もせず終了する。
+            3. 選んだIssueに `gh issue edit <番号> --add-label agent-in-progress`
+               でラベルを付ける。
+            4. `git checkout -b agent/issue-<番号>-<短い英語slug>` でブランチを作成する。
+            5. Issue本文の要求を実装する。対象は主に `frontend-tauri/src/`
+               (TypeScript/React) と `frontend-tauri/src-tauri/src/` (Rust)。
+            6. `frontend-tauri/` で `npm run build`、`frontend-tauri/src-tauri/` で
+               `cargo build` を実行し、両方成功することを確認する。
+               - 失敗したら原因を修正して再試行する(2回まで)。
+               - それでも解決しない場合は、
+                 `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-blocked`
+                 とし、詰まった理由を `gh issue comment <番号>` で説明して終了する
+                 (中途半端な実装をPRにしない)。
+            7. 成功したら、変更したファイルだけを明示的に `git add` してコミットする
+               (`git add -A` は使わない。無関係な変更を巻き込まないため)。
+            8. `git push -u origin <ブランチ名>` でpushする。
+            9. `gh pr create --base master --title "..." --body "..."` でPRを作成する。
+               本文には `Refs #<番号>` と記載する(`Fixes`/`Closes` は使わない。
+               マージ前にIssueが自動クローズされ、レビューが漏れるのを防ぐため)。
+            10. `gh issue edit <番号> --remove-label agent-in-progress --add-label agent-authored`
+            11. `gh issue comment <番号> --body "PRを作成しました: <PR URL>"`
+            12. `TaskSheets/YYYY-MM-DD-issue-<番号>.md` を規定のテンプレート
+                (タイトル/日付/ステータス/目的/やったこと/次にやること)で作成し、
+                同じブランチ・同じコミットに含める。
+
+            ## 厳守事項(ガードレール)
+            - `master` への直接push・force pushは絶対に行わない。
+            - 作成したPRを自分でマージしない(マージは人間が行う)。
+            - `.github/workflows/` 配下のファイルは変更しない。
+            - 依存関係の破壊的アップグレード、バージョン/リリースタグの操作はしない。
+            - シークレットやトークンの扱いを変更する変更はしない。
+            - 1回の実行で対応するIssueは1件のみ。
+            - 自信を持って実装できない設計判断が必要な場合は、無理に実装せず
+              `agent-blocked` にして人間に委ねる。
