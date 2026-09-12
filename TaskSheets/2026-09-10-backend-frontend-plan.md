@@ -623,3 +623,21 @@ Gmail有効化作業中に「GCPのクライアント情報をアプリ本体に
 作ろうとすると、精度に見合わない複雑さ(独自地図較正、波の到達半径計算等)を
 抱え込みやすい。今後同種の「面白そうだが本質的価値が薄い」機能は、実装に
 着手する前にもう一段立ち止まって要否を確認する。
+
+## Windowsリリースのバージョン採番方式を変更
+
+「バージョン番号はどうつけていくのが正しいか」という質問を受けて相談した結果、
+以下の方針に決定:
+- 個人開発でCIが継続的にビルド・リリースする形なので、厳密なSemVer運用
+  (fix=patch/feature=minor/breaking=major)までは不要と判断。
+- patch番号は引き続きCIが`GITHUB_RUN_NUMBER`で自動採番。
+- major.minorは`tauri.conf.json`にコミットされた値をそのまま使い、
+  意味のある区切り(機能セットが一段落した、安定版と呼べる等)でのみ手動で
+  上げる方針に変更。
+
+`.github/workflows/windows-build.yml`の採番スクリプトを、`c.version`全体を
+`0.1.<run number>`で上書きする形から、`tauri.conf.json`内の`major.minor`を
+読み取ってpatchだけ`GITHUB_RUN_NUMBER`に差し替える形に修正
+(コミット`c9322ba`)。現在の`tauri.conf.json`は`0.1.0`のままなので、
+当面は引き続き`0.1.<run number>`が採番される。次にminorを上げたい
+タイミングが来たら`tauri.conf.json`の`version`を手で`0.2.0`等に書き換えるだけでよい。
