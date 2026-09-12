@@ -296,6 +296,7 @@ function App() {
         googleClientId,
         googleClientSecret,
         googleRefreshToken,
+        googleCalendarRefreshToken,
       ] = await Promise.all([
         getSetting("rakuten_app_id"),
         getSetting("vivaldi_email"),
@@ -303,6 +304,7 @@ function App() {
         getSetting("google_client_id"),
         getSetting("google_client_secret"),
         getSetting("google_refresh_token"),
+        getSetting("google_calendar_refresh_token"),
       ]);
       setStreamingContent("");
       const supportsTools =
@@ -315,6 +317,7 @@ function App() {
         googleClientId: googleClientId ?? undefined,
         googleClientSecret: googleClientSecret ?? undefined,
         googleRefreshToken: googleRefreshToken ?? undefined,
+        googleCalendarRefreshToken: googleCalendarRefreshToken ?? undefined,
         onStatus: (status) => {
           setToolStatus(status);
           setStreamingContent("");

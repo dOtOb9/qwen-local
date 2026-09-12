@@ -1,3 +1,4 @@
+mod calendar;
 mod github;
 mod gmail;
 mod mail;
@@ -80,7 +81,8 @@ pub fn run() {
             rakuten::search_rakuten,
             mail::fetch_recent_emails,
             gmail::google_oauth_login,
-            gmail::fetch_gmail_messages
+            gmail::fetch_gmail_messages,
+            calendar::list_calendar_events
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

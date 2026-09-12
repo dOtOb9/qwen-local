@@ -13,6 +13,7 @@ export type ToolContext = {
   googleClientId?: string;
   googleClientSecret?: string;
   googleRefreshToken?: string;
+  googleCalendarRefreshToken?: string;
   /** falseなら(モデルがtool呼び出し非対応の場合)ツール定義を一切送らない */
   supportsTools?: boolean;
   onStatus?: (status: string) => void;
@@ -24,6 +25,7 @@ type SearchResult = { title: string; url: string; snippet: string };
 type RakutenItem = { name: string; price: number; url: string; shop: string };
 type EmailSummary = { from: string; subject: string; date: string; unread: boolean };
 type GmailSummary = { from: string; subject: string; date: string; snippet: string };
+type CalendarEvent = { summary: string; start: string; end: string; location?: string };
 
 type ToolDef = {
   type: "function";
@@ -101,6 +103,21 @@ const GMAIL_TOOL: ToolDef = {
   },
 };
 
+const CALENDAR_TOOL: ToolDef = {
+  type: "function",
+  function: {
+    name: "check_calendar",
+    description:
+      "Googleカレンダーの直近7日以内の予定を確認する。今日の予定・今週の予定に" +
+      "ついて聞かれた時に使う。",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
@@ -142,6 +159,20 @@ async function callTool(
       clientSecret: ctx.googleClientSecret,
       refreshToken: ctx.googleRefreshToken,
       limit: 10,
+    });
+    return JSON.stringify(results);
+  }
+  if (
+    name === "check_calendar" &&
+    ctx.googleClientId &&
+    ctx.googleClientSecret &&
+    ctx.googleCalendarRefreshToken
+  ) {
+    ctx.onStatus?.("カレンダーを確認中...");
+    const results = await invoke<CalendarEvent[]>("list_calendar_events", {
+      clientId: ctx.googleClientId,
+      clientSecret: ctx.googleClientSecret,
+      refreshToken: ctx.googleCalendarRefreshToken,
     });
     return JSON.stringify(results);
   }
@@ -260,6 +291,9 @@ export async function chatWithTools(
     if (ctx.vivaldiEmail && ctx.vivaldiPassword) tools.push(EMAIL_TOOL);
     if (ctx.googleClientId && ctx.googleClientSecret && ctx.googleRefreshToken) {
       tools.push(GMAIL_TOOL);
+    }
+    if (ctx.googleClientId && ctx.googleClientSecret && ctx.googleCalendarRefreshToken) {
+      tools.push(CALENDAR_TOOL);
     }
   }
 

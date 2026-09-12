@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getSetting, setSetting } from "@/lib/db";
 
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
@@ -25,6 +26,10 @@ export function SettingsDialog() {
   const [googleClientSecret, setGoogleClientSecret] = useState("");
   const [googleRefreshToken, setGoogleRefreshToken] = useState("");
   const [googleLoginStatus, setGoogleLoginStatus] = useState<string | null>(null);
+  const [googleCalendarRefreshToken, setGoogleCalendarRefreshToken] = useState("");
+  const [googleCalendarLoginStatus, setGoogleCalendarLoginStatus] = useState<string | null>(
+    null,
+  );
   const [systemPrompt, setSystemPrompt] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -40,6 +45,7 @@ export function SettingsDialog() {
         savedGoogleClientId,
         savedGoogleClientSecret,
         savedGoogleRefreshToken,
+        savedGoogleCalendarRefreshToken,
         savedSystemPrompt,
       ] = await Promise.all([
         getSetting("github_token"),
@@ -50,6 +56,7 @@ export function SettingsDialog() {
         getSetting("google_client_id"),
         getSetting("google_client_secret"),
         getSetting("google_refresh_token"),
+        getSetting("google_calendar_refresh_token"),
         getSetting("system_prompt"),
       ]);
       setToken(savedToken ?? "");
@@ -60,8 +67,10 @@ export function SettingsDialog() {
       setGoogleClientId(savedGoogleClientId ?? "");
       setGoogleClientSecret(savedGoogleClientSecret ?? "");
       setGoogleRefreshToken(savedGoogleRefreshToken ?? "");
+      setGoogleCalendarRefreshToken(savedGoogleCalendarRefreshToken ?? "");
       setSystemPrompt(savedSystemPrompt ?? "");
       setGoogleLoginStatus(null);
+      setGoogleCalendarLoginStatus(null);
     })();
   }, [open]);
 
@@ -104,6 +113,33 @@ export function SettingsDialog() {
       setGoogleLoginStatus("ログインしました");
     } catch (e) {
       setGoogleLoginStatus(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function loginWithGoogleCalendar() {
+    setGoogleCalendarLoginStatus("ブラウザでログインしてください...");
+    try {
+      const clientId = googleClientId.trim();
+      const clientSecret = googleClientSecret.trim();
+      await Promise.all([
+        setSetting("google_client_id", clientId),
+        setSetting("google_client_secret", clientSecret),
+      ]);
+      const tokens = await invoke<{ access_token: string; refresh_token?: string }>(
+        "google_oauth_login",
+        { clientId, clientSecret, scope: CALENDAR_SCOPE },
+      );
+      if (!tokens.refresh_token) {
+        setGoogleCalendarLoginStatus(
+          "refresh tokenが取得できませんでした。Googleアカウントの連携済みアプリからこのアプリを一度解除して、再度お試しください。",
+        );
+        return;
+      }
+      await setSetting("google_calendar_refresh_token", tokens.refresh_token);
+      setGoogleCalendarRefreshToken(tokens.refresh_token);
+      setGoogleCalendarLoginStatus("ログインしました");
+    } catch (e) {
+      setGoogleCalendarLoginStatus(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -197,6 +233,27 @@ export function SettingsDialog() {
             )}
             {googleLoginStatus && (
               <p className="text-xs text-muted-foreground">{googleLoginStatus}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <h3 className="text-xs font-semibold text-muted-foreground">Googleカレンダー</h3>
+            <p className="text-xs text-muted-foreground">
+              上記のGoogle OAuthクライアントID/シークレットを使う。Gmailとは
+              スコープが異なるため、連携は別途必要。
+            </p>
+            <Button
+              variant="outline"
+              onClick={loginWithGoogleCalendar}
+              disabled={!googleClientId.trim() || !googleClientSecret.trim()}
+            >
+              {googleCalendarRefreshToken ? "Googleカレンダーで再ログイン" : "Googleカレンダーでログイン"}
+            </Button>
+            {googleCalendarRefreshToken && (
+              <p className="text-xs text-muted-foreground">連携済みです</p>
+            )}
+            {googleCalendarLoginStatus && (
+              <p className="text-xs text-muted-foreground">{googleCalendarLoginStatus}</p>
             )}
           </div>
 
