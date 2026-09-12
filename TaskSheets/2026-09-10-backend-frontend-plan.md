@@ -424,16 +424,38 @@ GitHub Actionsの定期実行でクラウドのClaude Codeが実装してPRを�
 `git add -A`は避け、自分が触ったファイルだけを明示的にstageすること。
 `agent-harness-design.md`(Issue→PR自律化の設計)は別セッションが対応中のため触らない。
 
+## Gmail連携(OAuth 2.0 PKCEフロー)を実装
+
+Calendarは別セッションが対応中とのことなので対象外。Gmailのみ実装。
+
+- Google Cloud ConsoleでのOAuthクライアント作成(デスクトップアプリ種別、
+  スコープ`gmail.readonly`)はユーザー側の作業として依頼(代行不可)。
+- `src-tauri/src/gmail.rs`に本格的なOAuth 2.0 Authorization Code + PKCEの
+  「ループバック」フローを実装(トークン貼り付けではない):
+  1. ローカルの空きポートでTCPリスナーを立てる
+  2. PKCE code_verifier/challengeを生成し、`open`クレートでシステムの
+     既定ブラウザを開いてGoogleの認可画面を表示
+  3. ユーザーがログイン・許可すると`http://127.0.0.1:<port>/callback`に
+     リダイレクトされ、コードをローカルリスナーで受け取る
+  4. コードをGoogleのトークンエンドポイントに送ってaccess_token/refresh_token
+     に交換
+  - `refresh_token`だけを`settings`テーブルに保存し、以降は`fetch_gmail_messages`
+    コマンド内で毎回リフレッシュしてaccess_tokenを取得する(再ログイン不要)。
+  - Gmail APIはメッセージ一覧に本文/件名が含まれないため、一覧取得後に
+    1件ずつ`format=metadata`で件名・差出人・日付を取得するN+1呼び出しになる
+    (limit=10で11リクエスト程度、許容範囲と判断)。
+- フロント側は`SettingsDialog.tsx`に Client ID/Secret入力欄と
+  「Googleでログイン」ボタンを追加。ボタン押下で`google_oauth_login`
+  コマンドを呼び、ブラウザでの認可完了を待ってrefresh_tokenを保存する。
+  `check_gmail`ツールをOllamaに追加(Client ID/Secret/refresh_token全て
+  揃っている時だけ提示)。
+
 ## 次にやること
 
 - Rakuten Application IDを発行してもらい、実際に商品検索が動くか確認する
 - Vivaldi.netのメールアドレス/パスワードを設定して、実際にメール確認が動くか確認する
-- Google Calendar連携: 「秘書作業」をしてほしいという要望あり(2026-09-12)。
-  Gmailと同様、Google Cloud ConsoleでのOAuthクライアント作成(ユーザー側の
-  一手間)が前提。スコープはCalendar API(`calendar.events`等)。
-  着手前に「秘書作業」の具体的な範囲(予定の読み上げ/要約、リマインド、
-  チャットからの予定作成、のどこまでか)をユーザーに確認する必要あり。未着手。
-- Gmail連携の調査(OAuthクライアント作成手順の整理)
+- Google Cloud ConsoleでOAuthクライアントを作成し、実際にGmailログイン
+  フローが通るか確認する
 - 銀行口座連携: Money Forward ME等の公式連携APIの調査(直接スクレイピングはしない)
 - (ユーザー対応待ち) `/install-github-app`の実行、およびcronワークフローの内容確定
 - (保留) 自動アップデートの実動作検証(v0.1.1→v0.1.2への自動更新確認)

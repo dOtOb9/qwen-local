@@ -271,15 +271,28 @@ function App() {
       }
       chatMessages.push(...nextMessages.map((m) => ({ role: m.role, content: m.content })));
 
-      const [rakutenAppId, vivaldiEmail, vivaldiPassword] = await Promise.all([
+      const [
+        rakutenAppId,
+        vivaldiEmail,
+        vivaldiPassword,
+        googleClientId,
+        googleClientSecret,
+        googleRefreshToken,
+      ] = await Promise.all([
         getSetting("rakuten_app_id"),
         getSetting("vivaldi_email"),
         getSetting("vivaldi_password"),
+        getSetting("google_client_id"),
+        getSetting("google_client_secret"),
+        getSetting("google_refresh_token"),
       ]);
       const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages, {
         rakutenAppId: rakutenAppId ?? undefined,
         vivaldiEmail: vivaldiEmail ?? undefined,
         vivaldiPassword: vivaldiPassword ?? undefined,
+        googleClientId: googleClientId ?? undefined,
+        googleClientSecret: googleClientSecret ?? undefined,
+        googleRefreshToken: googleRefreshToken ?? undefined,
         onStatus: setToolStatus,
       });
       setToolStatus(null);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSetting, setSetting } from "@/lib/db";
 
+const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
@@ -17,24 +20,43 @@ export function SettingsDialog() {
   const [rakutenAppId, setRakutenAppId] = useState("");
   const [vivaldiEmail, setVivaldiEmail] = useState("");
   const [vivaldiPassword, setVivaldiPassword] = useState("");
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
+  const [googleRefreshToken, setGoogleRefreshToken] = useState("");
+  const [googleLoginStatus, setGoogleLoginStatus] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [savedToken, savedRepo, savedRakutenAppId, savedVivaldiEmail, savedVivaldiPassword] =
-        await Promise.all([
-          getSetting("github_token"),
-          getSetting("github_repo"),
-          getSetting("rakuten_app_id"),
-          getSetting("vivaldi_email"),
-          getSetting("vivaldi_password"),
-        ]);
+      const [
+        savedToken,
+        savedRepo,
+        savedRakutenAppId,
+        savedVivaldiEmail,
+        savedVivaldiPassword,
+        savedGoogleClientId,
+        savedGoogleClientSecret,
+        savedGoogleRefreshToken,
+      ] = await Promise.all([
+        getSetting("github_token"),
+        getSetting("github_repo"),
+        getSetting("rakuten_app_id"),
+        getSetting("vivaldi_email"),
+        getSetting("vivaldi_password"),
+        getSetting("google_client_id"),
+        getSetting("google_client_secret"),
+        getSetting("google_refresh_token"),
+      ]);
       setToken(savedToken ?? "");
       setRepo(savedRepo ?? "dOtOb9/qwen-local");
       setRakutenAppId(savedRakutenAppId ?? "");
       setVivaldiEmail(savedVivaldiEmail ?? "");
       setVivaldiPassword(savedVivaldiPassword ?? "");
+      setGoogleClientId(savedGoogleClientId ?? "");
+      setGoogleClientSecret(savedGoogleClientSecret ?? "");
+      setGoogleRefreshToken(savedGoogleRefreshToken ?? "");
+      setGoogleLoginStatus(null);
     })();
   }, [open]);
 
@@ -45,9 +67,38 @@ export function SettingsDialog() {
       setSetting("rakuten_app_id", rakutenAppId.trim()),
       setSetting("vivaldi_email", vivaldiEmail.trim()),
       setSetting("vivaldi_password", vivaldiPassword.trim()),
+      setSetting("google_client_id", googleClientId.trim()),
+      setSetting("google_client_secret", googleClientSecret.trim()),
     ]);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function loginWithGoogle() {
+    setGoogleLoginStatus("ブラウザでログインしてください...");
+    try {
+      const clientId = googleClientId.trim();
+      const clientSecret = googleClientSecret.trim();
+      await Promise.all([
+        setSetting("google_client_id", clientId),
+        setSetting("google_client_secret", clientSecret),
+      ]);
+      const tokens = await invoke<{ access_token: string; refresh_token?: string }>(
+        "google_oauth_login",
+        { clientId, clientSecret, scope: GMAIL_SCOPE },
+      );
+      if (!tokens.refresh_token) {
+        setGoogleLoginStatus(
+          "refresh tokenが取得できませんでした。Googleアカウントの連携済みアプリからこのアプリを一度解除して、再度お試しください。",
+        );
+        return;
+      }
+      await setSetting("google_refresh_token", tokens.refresh_token);
+      setGoogleRefreshToken(tokens.refresh_token);
+      setGoogleLoginStatus("ログインしました");
+    } catch (e) {
+      setGoogleLoginStatus(e instanceof Error ? e.message : String(e));
+    }
   }
 
   return (
@@ -57,7 +108,7 @@ export function SettingsDialog() {
           設定
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>設定</DialogTitle>
         </DialogHeader>
@@ -111,6 +162,38 @@ export function SettingsDialog() {
               onChange={(e) => setVivaldiPassword(e.currentTarget.value)}
             />
           </div>
+
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <h3 className="text-xs font-semibold text-muted-foreground">Gmail</h3>
+            <label className="text-xs text-muted-foreground">
+              Google OAuth クライアントID(デスクトップアプリ)
+            </label>
+            <Input
+              value={googleClientId}
+              onChange={(e) => setGoogleClientId(e.currentTarget.value)}
+              placeholder="xxxxx.apps.googleusercontent.com"
+            />
+            <label className="text-xs text-muted-foreground">クライアントシークレット</label>
+            <Input
+              type="password"
+              value={googleClientSecret}
+              onChange={(e) => setGoogleClientSecret(e.currentTarget.value)}
+            />
+            <Button
+              variant="outline"
+              onClick={loginWithGoogle}
+              disabled={!googleClientId.trim() || !googleClientSecret.trim()}
+            >
+              {googleRefreshToken ? "Googleで再ログイン" : "Googleでログイン"}
+            </Button>
+            {googleRefreshToken && (
+              <p className="text-xs text-muted-foreground">連携済みです</p>
+            )}
+            {googleLoginStatus && (
+              <p className="text-xs text-muted-foreground">{googleLoginStatus}</p>
+            )}
+          </div>
+
           <Button onClick={save}>{saved ? "保存しました" : "保存"}</Button>
         </div>
       </DialogContent>

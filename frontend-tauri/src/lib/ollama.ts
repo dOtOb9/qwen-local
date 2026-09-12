@@ -11,12 +11,16 @@ export type ToolContext = {
   rakutenAppId?: string;
   vivaldiEmail?: string;
   vivaldiPassword?: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleRefreshToken?: string;
   onStatus?: (status: string) => void;
 };
 
 type SearchResult = { title: string; url: string; snippet: string };
 type RakutenItem = { name: string; price: number; url: string; shop: string };
 type EmailSummary = { from: string; subject: string; date: string; unread: boolean };
+type GmailSummary = { from: string; subject: string; date: string; snippet: string };
 
 type ToolDef = {
   type: "function";
@@ -96,6 +100,21 @@ const EMAIL_TOOL: ToolDef = {
   },
 };
 
+const GMAIL_TOOL: ToolDef = {
+  type: "function",
+  function: {
+    name: "check_gmail",
+    description:
+      "Gmailの受信メール(直近10件)を確認する。未読メール・最近届いたメールに" +
+      "ついて聞かれた時に使う。",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
@@ -125,6 +144,21 @@ async function callTool(
     });
     return JSON.stringify(results);
   }
+  if (
+    name === "check_gmail" &&
+    ctx.googleClientId &&
+    ctx.googleClientSecret &&
+    ctx.googleRefreshToken
+  ) {
+    ctx.onStatus?.("Gmailを確認中...");
+    const results = await invoke<GmailSummary[]>("fetch_gmail_messages", {
+      clientId: ctx.googleClientId,
+      clientSecret: ctx.googleClientSecret,
+      refreshToken: ctx.googleRefreshToken,
+      limit: 10,
+    });
+    return JSON.stringify(results);
+  }
   if (name === "check_owned_ebooks") {
     const query = String(args.query ?? "");
     ctx.onStatus?.(`蔵書を確認中: ${query}`);
@@ -146,6 +180,9 @@ export async function chatWithTools(
   const tools: ToolDef[] = [SEARCH_TOOL, EBOOK_TOOL];
   if (ctx.rakutenAppId) tools.push(RAKUTEN_TOOL);
   if (ctx.vivaldiEmail && ctx.vivaldiPassword) tools.push(EMAIL_TOOL);
+  if (ctx.googleClientId && ctx.googleClientSecret && ctx.googleRefreshToken) {
+    tools.push(GMAIL_TOOL);
+  }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await fetch(`${ollamaUrl}/api/chat`, {

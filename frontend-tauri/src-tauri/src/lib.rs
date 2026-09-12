@@ -1,5 +1,6 @@
 mod ebooks;
 mod github;
+mod gmail;
 mod mail;
 mod rakuten;
 mod search;
@@ -75,7 +76,9 @@ pub fn run() {
             rakuten::search_rakuten,
             ebooks::sync_kindle_library,
             ebooks::sync_kinoppy_library,
-            mail::fetch_recent_emails
+            mail::fetch_recent_emails,
+            gmail::google_oauth_login,
+            gmail::fetch_gmail_messages
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
