@@ -1,4 +1,3 @@
-mod ebooks;
 mod github;
 mod gmail;
 mod mail;
@@ -57,6 +56,11 @@ pub fn run() {
             );
         ",
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 4,
+        description: "drop_ebooks",
+        sql: "DROP TABLE IF EXISTS ebooks;",
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -74,8 +78,6 @@ pub fn run() {
             search::search_web,
             github::create_github_issue,
             rakuten::search_rakuten,
-            ebooks::sync_kindle_library,
-            ebooks::sync_kinoppy_library,
             mail::fetch_recent_emails,
             gmail::google_oauth_login,
             gmail::fetch_gmail_messages
