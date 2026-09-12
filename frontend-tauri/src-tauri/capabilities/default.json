@@ -12,7 +12,6 @@
     "process:default",
     "dialog:default",
     "fs:default",
-    "fs:allow-read-file",
-    "notification:default"
+    "fs:allow-read-file"
   ]
 }
