@@ -29,14 +29,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Bump app version for this build
+      - name: Set patch version for this build
         shell: bash
         run: |
           node -e "
             const fs = require('fs');
             const p = 'src-tauri/tauri.conf.json';
             const c = JSON.parse(fs.readFileSync(p, 'utf8'));
-            c.version = '0.1.' + process.env.GITHUB_RUN_NUMBER;
+            const [major, minor] = c.version.split('.');
+            c.version = major + '.' + minor + '.' + process.env.GITHUB_RUN_NUMBER;
             fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
           "
 
