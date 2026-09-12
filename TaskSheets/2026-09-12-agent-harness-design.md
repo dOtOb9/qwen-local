@@ -150,6 +150,24 @@ blocked. Creates branches and provides pre-filled PR links instead.")。
 `claude_args`には`DEBUG: true`の`settings`も追加し、次回実行時に
 何が拒否されているかをより詳しく追えるようにした。
 
+## 初のエンドツーエンド成功(2026-09-12)
+
+3回目の手動実行(run 34676484244)は、Issue #1(ストリーミング表示)の実装・
+build確認・TaskSheets記録まで完走したが、`max-turns`(30)にちょうど届かず
+最後のラベル変更・compare URLコメントだけ未完了で終わった。実装内容
+(`frontend-tauri/src/lib/ollama.ts`にNDJSONストリーミング読み取りを実装、
+tool_calls検出時の打ち切り、`reader.cancel()`での後始末まで含む)は
+質・完成度とも十分だったため、最後の1ステップ(ラベル付け替え・
+compare URLコメント)のみ人間側で代行した。
+
+`max-turns`を60に引き上げる[PR #9](https://github.com/dOtOb9/qwen-local/pull/9)
+をマージ後、ユーザーがcompare URLから[PR #10](https://github.com/dOtOb9/qwen-local/pull/10)
+を作成・マージ。**Issue起票からPRマージまでの一連の流れが初めて成立した**。
+Issue #1はクローズ済み。
+
+残り: Issue #2(モデル切り替え)、#3(System Prompt設定)、#4(Google Calendar連携)
+が`agent-ready`のまま残っている。6時間おきのcronで今後自動的に拾われる見込み。
+
 ## 実行場所についての結論
 
 このハーネスを駆動するのはOllamaではなくClaude Code自身（コーディング
