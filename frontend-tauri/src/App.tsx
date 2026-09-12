@@ -23,14 +23,21 @@ import {
   type StoredMessage,
 } from "@/lib/db";
 import { checkForUpdateAndInstall } from "@/lib/updater";
-import { chatWithTools } from "@/lib/ollama";
+import { chatWithTools, fetchAvailableModels } from "@/lib/ollama";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   buildAttachedFileMessage,
   extractPdfText,
   parseAttachedFileMessage,
 } from "@/lib/pdf";
 import { createGithubIssue, IDEA_DETECTION_PROMPT, parseIdeaMessage } from "@/lib/github";
-import { getSetting } from "@/lib/db";
+import { getSetting, setSetting } from "@/lib/db";
 import { watchEarthquakes, fetchRecentEarthquakes, type EarthquakeInfo } from "@/lib/earthquake";
 import { EarthquakeView } from "@/components/EarthquakeView";
 import { Dock } from "@/components/Dock";
@@ -68,6 +75,8 @@ function App() {
   const [earthquakeAlert, setEarthquakeAlert] = useState<EarthquakeInfo | null>(null);
   const [earthquakeHistory, setEarthquakeHistory] = useState<EarthquakeInfo[]>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "earthquake">("chat");
+  const [selectedModel, setSelectedModel] = useState(MODEL);
+  const [availableModels, setAvailableModels] = useState<string[]>([MODEL]);
 
   useEffect(() => {
     fetchRecentEarthquakes().then((history) => {
@@ -141,7 +150,28 @@ function App() {
         console.error("Update check failed:", e);
       });
     }
+
+    (async () => {
+      const savedModel = await getSetting("selected_model");
+      try {
+        const models = await fetchAvailableModels(OLLAMA_URL);
+        if (models.length > 0) {
+          setAvailableModels(models);
+          setSelectedModel(savedModel && models.includes(savedModel) ? savedModel : models[0]);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to fetch Ollama models:", e);
+      }
+      // Ollama未起動時などはフォールバックとして既定のMODELを使う
+      if (savedModel) setSelectedModel(savedModel);
+    })();
   }, []);
+
+  async function handleSelectModel(model: string) {
+    setSelectedModel(model);
+    await setSetting("selected_model", model);
+  }
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -312,7 +342,7 @@ function App() {
         getSetting("google_refresh_token"),
       ]);
       setStreamingContent("");
-      const assistantContent = await chatWithTools(OLLAMA_URL, MODEL, chatMessages, {
+      const assistantContent = await chatWithTools(OLLAMA_URL, selectedModel, chatMessages, {
         rakutenAppId: rakutenAppId ?? undefined,
         vivaldiEmail: vivaldiEmail ?? undefined,
         vivaldiPassword: vivaldiPassword ?? undefined,
@@ -382,6 +412,18 @@ function App() {
           {appVersion && (
             <span className="text-xs text-muted-foreground">v{appVersion}</span>
           )}
+          <Select value={selectedModel} onValueChange={handleSelectModel}>
+            <SelectTrigger size="sm" className="ml-auto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableModels.map((model) => (
+                <SelectItem key={model} value={model}>
+                  {model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {updateStatus && (
