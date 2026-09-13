@@ -40,13 +40,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: true
           settings: |
             {
               "env": { "DEBUG": "true" }
             }
           claude_args: >-
             --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(cargo:*),Edit,Write,Read,Glob,Grep"
-            --max-turns 60
+            --max-turns 100
           prompt: |
             あなたは qwen-local リポジトリ(Tauriデスクトップアプリ、本体は
             frontend-tauri/)の自律開発エージェントです。以下の手順で、
