@@ -115,7 +115,7 @@ pub fn google_oauth_login(
     })
 }
 
-fn refresh_access_token(
+pub(crate) fn refresh_access_token(
     client: &reqwest::blocking::Client,
     client_id: &str,
     client_secret: &str,

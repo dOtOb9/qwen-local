@@ -37,6 +37,7 @@ open = "5.4.4"
 sha2 = "0.11.0"
 rand = "0.10.2"
 base64 = "0.23.1"
+chrono = "0.4.42"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
